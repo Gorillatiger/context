@@ -192,6 +192,9 @@ function boundedOutput(value,budget=9000){
   const copy=JSON.parse(JSON.stringify(value));
   const entries=copy.results||copy.tasks||(copy.text!==undefined?[copy]:[]);
   while(JSON.stringify(copy).length>budget&&entries.length){
+    // A board outline is orientation only: shorten it and the notes before touching sections or results.
+    if(copy.outline?.length>8){copy.outline.length=Math.max(8,Math.floor(copy.outline.length*0.6));copy.outlineLimited=true;continue;}
+    if(copy.warnings?.length>1){copy.warnings.pop();continue;}
     if(copy.links?.length>6){copy.links.pop();copy.linksLimited=true;continue;}
     if(copy.controls?.length>6){copy.controls.pop();copy.controlsLimited=true;continue;}
     let trimmed=false;
@@ -341,7 +344,8 @@ export async function runProjectAgent({prompt,history=[],documents,workspace,get
           for(const key of ['loginRequired','permissionRequired','hasMore'])if(typeof raw[key]==='boolean')output[key]=raw[key];
           output.warnings=(Array.isArray(raw.warnings)?raw.warnings:[]).slice(0,3).map(value=>redactKnowledge(value).slice(0,160));
           // Boards: every read section by title, so the model knows the structure beyond the first excerpts.
-          if(grant.service==='miro'&&fresh.length)output.outline=fresh.slice(0,80).map(doc=>({id:doc.id,title:redactKnowledge(doc.title).slice(0,80)}));
+          // Titles only (ids add ~75 characters each); boundedOutput shortens it first and flags outlineLimited.
+          if(grant.service==='miro'&&fresh.length>1)output.outline=fresh.slice(0,60).map(doc=>redactKnowledge(doc.title).slice(0,50));if(output.outline&&fresh.length>60)output.outlineLimited=true;
           if(raw.coverage&&typeof raw.coverage==='object')output.coverage={complete:raw.coverage.complete===true,status:redactKnowledge(raw.coverage.status).slice(0,40),read:Number.isSafeInteger(raw.coverage.read)?Math.min(100,Math.max(0,raw.coverage.read)):0,total:Number.isSafeInteger(raw.coverage.total)?Math.min(100000,Math.max(0,raw.coverage.total)):0};
           if(/^[a-f0-9]{64}$/.test(raw.contentRevision||''))output.contentRevision=raw.contentRevision;
           if(Number.isSafeInteger(raw.nextOffset)&&raw.nextOffset>=0&&raw.nextOffset<=60000)output.nextOffset=raw.nextOffset;

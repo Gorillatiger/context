@@ -62,7 +62,7 @@ app.whenReady().then(async()=>{
         return {content:JSON.stringify({type:'answer',text:ids.length?'Auf dem Board stehen u. a. diese Bereiche.':'Ich konnte das Board nicht lesen.',citations:ids})};
       }});
     const outline=(lastToolOutput.match(/"outline":\[(.*?)\]/)||[])[1]||'';
-    return {timings,sources:(result.sources||[]).filter(doc=>doc.kind==='miro').length,answer:String(result.content||'').slice(0,400),tools:result.steps.map(step=>step.tool),outline:(outline.match(/"title":"/g)||[]).length,seconds:+((Date.now()-started)/1000).toFixed(1),label:context.label,step:result.steps[0]&&{label:result.steps[0].label,status:result.steps[0].status,detail:result.steps[0].detail},citations:result.citations.map(doc=>({title:doc.title,url:doc.url}))};
+    return {timings,sources:(result.sources||[]).filter(doc=>doc.kind==='miro').length,answer:String(result.content||'').slice(0,400),tools:result.steps.map(step=>step.tool),outline:outline?outline.split('","').length:0,seconds:+((Date.now()-started)/1000).toFixed(1),label:context.label,step:result.steps[0]&&{label:result.steps[0].label,status:result.steps[0].status,detail:result.steps[0].detail},citations:result.citations.map(doc=>({title:doc.title,url:doc.url}))};
   }
 
   if(MODEL){

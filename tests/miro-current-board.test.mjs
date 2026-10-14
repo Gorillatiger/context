@@ -103,3 +103,19 @@ test('an answer without ids links only board sections it names exactly, never in
   run=await agentRun({pageContext:{},replies:[answer('Personas sind hilfreich.',[])]});
   assert.deepEqual(run.result.citations,[]);
 });
+
+test('a board with hundreds of sections still returns a usable, bounded read instead of "Werkzeugergebnis ist zu groß"',async()=>{
+  const state=workspace({boardFindings:validateBoardFindings(planCurrentBoard(workspace(),board,'courseA').boardFindings)}),source=platformCatalog(state).find(row=>row.url===OPEN);
+  const docs=Array.from({length:300},(_,index)=>({id:'miro:'+index.toString(16).padStart(64,'0')+':part0',kind:'miro',service:'miro',source:'Miro',sourceId:source.id,projectId:'courseA',boardURL:source.url,boardId:'uXjVOpenBoard=',itemId:String(1000+index),url:source.url+'?moveToWidget='+(1000+index),title:'Folie '+index+' mit einem ziemlich langen Titel zur Gliederung',text:'Board: Prototyping\nFolie '+index+'\n'+'Inhalt der Folie. '.repeat(80),status:'full',accountGeneration:'b'.repeat(64),fetchedAt:'2026-10-14T15:00:00Z'}));
+  const seen=[];
+  for(const name of ['read_current_board','search_platform']){
+    const replies=[name==='read_current_board'?tool(name):tool(name,{sourceId:source.id,query:'Folie 7'}),answer('Fertig')];
+    const run=await runProjectAgent({prompt:'Was steht auf dem Board?',workspace:state,getWorkspace:()=>state,documents:[],projectId:'courseA',pageContext:{currentBoard:board},currentBoard:async()=>source.id,
+      platform:async()=>({documents:docs,result:{sourceId:source.id,service:'miro',results:docs.slice(0,5).map(doc=>({id:doc.id,title:doc.title,text:doc.text})),coverage:{complete:true},warnings:['Gelesen über Miros öffentliche Board-Übersicht für Screenreader (Besucherzugriff, keine offizielle Schnittstelle).','Fuenf Bilder wurden nicht ausgelesen; bekannt sind nur ihre Dateinamen.']}}),
+      complete:async messages=>{seen.push(messages.at(-1).content);return replies.shift();}});
+    assert.equal(run.steps[0].status,'done',name+': '+run.steps[0].detail);
+  }
+  assert.ok(seen.every(content=>!/Werkzeugergebnis ist zu groß/.test(content)));
+  const result=seen.find(content=>content.startsWith('WERKZEUGERGEBNIS'));assert.ok(result.length<11000);
+  assert.match(result,/"outlineLimited":true/);assert.match(result,/Folie 0/);
+});
