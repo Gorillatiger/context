@@ -35,6 +35,7 @@ import {createNangoConnectionsView} from './nango-connections.js';
 import {captureMailViewport,restoreMailViewport} from './mail-layout.js';
 import {validateLocalAction} from './knowledge.js';
 import {resolveAgentContext} from './agent-context.js';
+import {planCurrentBoard} from './current-board.js';
 import {createFloatingAgent} from './floating-agent.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -96,7 +97,7 @@ function currentAgentContext(){
 function syncAgentContext(){floatingAgent?.render();}
 window.addEventListener('context-browser-page',event=>{
   const detail=event.detail||{};
-  browserContext={visible:detail.visible===true,current:detail.current===true,readable:detail.readable===true};
+  browserContext={visible:detail.visible===true,current:detail.current===true,readable:detail.readable===true,miroBoard:detail.miroBoard&&typeof detail.miroBoard.url==='string'?{url:detail.miroBoard.url.slice(0,2048),title:String(detail.miroBoard.title||'').slice(0,200)}:null};
   syncAgentContext();
 });
 
@@ -155,6 +156,24 @@ function save() {
 }
 function activity(title) { state.activity.unshift({ id:uid(), title, at:new Date().toISOString() }); state.activity=state.activity.slice(0,60); }
 function commit(title) { if(title) activity(title); const ok=save(); if(ok)syncDiaryReminders(); companion?.update(); render(); return ok; }
+// The assistant may read the board open in the browser. A board that is not yet
+// a course source is assigned to the chat's course (announced with undo); the
+// read itself stays an ordinary scope-checked platform source read.
+async function ensureCurrentBoard({projectId='',signal}={}){
+  const board=currentAgentContext().currentBoard,plan=planCurrentBoard(state,board,projectId);
+  if(!plan.assigned)return plan.sourceId;
+  const previous=state;state={...state,boardFindings:plan.boardFindings};
+  if(!save()){state=previous;throw new Error('Das Board konnte nicht gespeichert werden. Bitte zuerst den Workspace-Speicher prüfen.');}
+  const release=()=>{state={...state,boardFindings:(state.boardFindings||[]).filter(row=>row.id!==plan.findingId)};save();render();};
+  toast(`„${plan.boardTitle}“ wurde dem Kurs „${plan.courseName}“ zugeordnet.`,release);
+  render();if(signal?.aborted)throw new DOMException('Abgebrochen','AbortError');
+  await sourceHub.sync();const ready=planCurrentBoard(state,board,projectId);
+  if(ready.assigned){release();throw new Error('Das Board konnte nicht als Kursquelle freigegeben werden.');}
+  // Unreadable boards (private, removed) must not stay attached to the course.
+  return {sourceId:ready.sourceId,undo:release,
+    // Announced only after a successful read, with the board's real title (also kept in the directory).
+    done:title=>{const name=String(title||'').trim().slice(0,240)||plan.boardTitle;state={...state,boardFindings:(state.boardFindings||[]).map(row=>row.id===plan.findingId&&name!=='Miro-Board'?{...row,miroTitle:name}:row)};save();render();toast(`„${name}“ ist jetzt eine Quelle im Kurs „${plan.courseName}“.`,release);}};
+}
 function toast(text, undoCallback) {
   clearTimeout(toastTimer); undo=undoCallback;
   $('#toast').innerHTML=`<span>${esc(text)}</span>${undoCallback?'<button data-action="undo">Rückgängig</button>':''}`;
@@ -213,7 +232,7 @@ const kiView=createKIView({onSpaces:(tool,args,signal)=>spacesSearch.tool(tool,a
   if(view!=='ai'){syncAgentContext();return;}
   const active=document.activeElement,id=active?.id,selection=(active instanceof HTMLTextAreaElement||active instanceof HTMLInputElement)&&active.selectionStart!==null?[active.selectionStart,active.selectionEnd,active.selectionDirection]:null;
   render();const replacement=id?document.getElementById(id):null;if(replacement){replacement.focus({preventScroll:true});if(selection&&typeof replacement.setSelectionRange==='function')replacement.setSelectionRange(...selection);}
-},getContext:()=>{const context=currentAgentContext();return {workspace:{...state,activeCourse:context.projectId},updates:remoteItems,browserSources:allBrowserSources(),platformSources:sourceHub.documents(),sources:sourceStates,pageContext:context};},onPlatform:(name,args,signal,scope)=>sourceHub.tool(name,args,signal,scope),onBrowserRead:(page,scope)=>platformDiscovery.discover(page,scope),onAction:applyAgentAction,onUndo:undoAgentAction,onCalendarOpen:()=>calendarView.open(),onCalendarExport:ids=>{const value=calendarICSForIds(ids,state),url=URL.createObjectURL(new Blob([value],{type:'text/calendar;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='context-terminplan-'+dateKey()+'.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);},onSource:source=>{
+},getContext:()=>{const context=currentAgentContext();return {workspace:{...state,activeCourse:context.projectId},updates:remoteItems,browserSources:allBrowserSources(),platformSources:sourceHub.documents(),sources:sourceStates,pageContext:context};},onPlatform:(name,args,signal,scope)=>sourceHub.tool(name,args,signal,scope),onCurrentBoard:options=>ensureCurrentBoard(options),onBrowserRead:(page,scope)=>platformDiscovery.discover(page,scope),onAction:applyAgentAction,onUndo:undoAgentAction,onCalendarOpen:()=>calendarView.open(),onCalendarExport:ids=>{const value=calendarICSForIds(ids,state),url=URL.createObjectURL(new Blob([value],{type:'text/calendar;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='context-terminplan-'+dateKey()+'.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);},onSource:source=>{
  if(['miro','service'].includes(source.kind)&&source.url&&desktopBrowserAvailable()){setView('browser');void window.contextDesktop.browser({type:'new',url:source.url});return;}
   if(source.id?.startsWith('n:diary:'))diaryView.open(source.targetId,/\d{4}-\d{2}-\d{2}$/.test(source.id)?source.id.slice(-10):undefined);
   else if(source.kind==='notes')editMarkdownNote(source.targetId);

@@ -28,7 +28,8 @@ import {createDesktopPlatform} from './platform.mjs';
 import {createDocumentReader} from './document-reader.mjs';
 import {createCourseFileFetch} from './course-file-fetch.mjs';
 import {createMiroShareLinks} from './miro-links.mjs';
-import {createMiroVisitorReader} from './miro-visitor.mjs';
+import {createMiroVisitorReader,miroOffscreenViews} from './miro-visitor.mjs';
+import {safeMiroBoard} from '../connectors/miro.mjs';
 const desktopAI=createDesktopAI();
 let desktopCalendar,desktopNango,desktopNangoMail,desktopPlatform,desktopSpacesSearch,desktopMiroLinks;
 const desktopOCR=createDesktopOCR();
@@ -43,7 +44,7 @@ const emit=(type,detail)=>{if(win&&!win.isDestroyed()&&hubURL(win.webContents.ge
 const desktopSpeech=createDesktopSpeech({directory:path.join(app.getPath('userData'),'speech','models'),emit:event=>emit('context-speech',event)});
 const trusted=e=>{if(!win||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame||!hubURL(e.senderFrame.url))throw new Error('Zugriff auf den Arbeitsbereich verweigert.');};
 function state(){emit('context-browser-state',{active,session:sessionKeeper?.status(),tabs:[...tabs.values()].map(t=>({id:t.id,title:(/Login|Sign in/i.test(t.title||'')?t.label+' · ':'')+(t.title||'Neuer Tab'),url:displayURL(t.view.webContents.getURL()),loading:t.view.webContents.isLoading(),back:t.view.webContents.navigationHistory.canGoBack(),forward:t.view.webContents.navigationHistory.canGoForward(),error:t.error||''}))});pageState();desktopChatFilter?.schedule();}
-function pageState(){const t=tabs.get(active),url=t?.view.webContents.getURL()||'';let readable=false;try{safeSpacesURL(url);readable=true;}catch{}const size=win?.getContentSize(),visible=!!t&&!!size&&!!frameBounds(geometry,...size);emit('context-browser-page',{visible,current:visible||!!t&&geometry?.current===true,readable});desktopChatFilter?.schedule();}
+function pageState(){const t=tabs.get(active),url=t?.view.webContents.getURL()||'';let readable=false,miroBoard=null;try{safeSpacesURL(url);readable=true;}catch{}try{miroBoard={url:safeMiroBoard(url).url,title:String(t.title||'').replace(/\s+-\s+Miro$/,'').slice(0,200)};}catch{}const size=win?.getContentSize(),visible=!!t&&!!size&&!!frameBounds(geometry,...size);emit('context-browser-page',{visible,current:visible||!!t&&geometry?.current===true,readable,miroBoard});desktopChatFilter?.schedule();}
 function layout(){if(!win)return;const [w,h]=win.getContentSize();const bounds=frameBounds(geometry,w,h);for(const t of tabs.values()){const shown=t.id===active&&!!bounds;t.view.setVisible(shown);if(shown)t.view.setBounds(bounds);}pageState();}
 function select(id){if(!tabs.has(id))throw new Error('Dieser Browser-Tab ist nicht mehr geöffnet.');active=id;layout();state();}
 function create(url,{activate=true}={}){if(sessionKeeper?.status().mode==='initializing')throw new Error('Die Browser-Sitzung wird wiederhergestellt. Bitte kurz warten.');url=browserURL(url);if(tabs.size>=12)throw new Error('Bis zu zwölf Tabs sind möglich. Schließe zunächst einen Tab.');
@@ -54,7 +55,7 @@ function create(url,{activate=true}={}){if(sessionKeeper?.status().mode==='initi
  const guard=(e,url)=>{try{browserURL(url);}catch{e.preventDefault();t.error='Diese Adresse ist aus Sicherheitsgründen gesperrt.';state();}};
  wc.on('will-navigate',(e,url)=>guard(e,url));wc.on('will-redirect',(e,url)=>guard(e,url));
  wc.on('did-start-navigation',(_e,_url,_inPlace,main)=>{if(main){t.epoch++;t.links.clear();t.controls.clear();t.readAt='';t.error='';desktopChatFilter?.schedule();}});
- wc.on('did-navigate',state);wc.on('did-navigate-in-page',state);wc.on('did-start-loading',state);wc.on('did-stop-loading',state);
+ wc.on('did-navigate',(_event,next)=>{if(/[?&]share_link_id=/.test(next))try{desktopMiroLinks?.remember([next]);}catch{}state();});wc.on('did-navigate-in-page',state);wc.on('did-start-loading',state);wc.on('did-stop-loading',state);
  wc.on('before-input-event',(event,input)=>{if(input.type==='keyDown'&&input.key==='Escape'&&geometry?.focus===true&&!embedded){event.preventDefault();win.webContents.focus();emit('context-browser-escape',{});}});
  wc.on('page-title-updated',(_e,title)=>{t.title=String(title).slice(0,180);state();});
  wc.on('did-fail-load',(_e,code,_description,_url,main)=>{if(main&&code!==-3){t.error=`Die Seite konnte nicht geladen werden (${code}). Prüfe die Adresse und lade erneut.`;state();}});
@@ -164,9 +165,7 @@ providerSession.on('will-download',(_e,item)=>{item.setSaveDialogOptions({title:
 desktopMiroLinks=createMiroShareLinks({directory:path.join(app.getPath('userData'),'miro'),crypto:safeStorage});
 await desktopMiroLinks.initialize();
 // Public Miro boards are read as a visitor in a hidden, muted view of the website partition.
-const miroVisitor=createMiroVisitorReader({getShareLink:id=>desktopMiroLinks.get(id),
- createView:({webPreferences})=>{const view=new WebContentsView({webPreferences});view.setBounds({x:0,y:0,width:1280,height:900});view.setVisible(false);if(win&&!win.isDestroyed())win.contentView.addChildView(view);return view;},
- destroyView:view=>{try{if(win&&!win.isDestroyed())win.contentView.removeChildView(view);}catch{}if(!view.webContents.isDestroyed())view.webContents.close();}});
+const miroVisitor=createMiroVisitorReader({getShareLink:id=>desktopMiroLinks.get(id),...miroOffscreenViews(BrowserWindow)});
 desktopPlatform=createDesktopPlatform({nango:desktopNango,miroVisitor,miroLinks:desktopMiroLinks,getAccountFingerprint:async service=>{const host=({gitlab:'git.coco.study',sciebo:'th-koeln.sciebo.de',mattermost:'chat.coco.study'})[service];const cookies=await providerSession.cookies.get({});return createHash('sha256').update(JSON.stringify([service,cookies.filter(cookie=>{const domain=String(cookie.domain||'').replace(/^\./,'');return (host===domain||host.endsWith('.'+domain))&&(cookie.httpOnly||/session|token|auth|userid/i.test(cookie.name));}).map(cookie=>[cookie.domain,cookie.path,cookie.name,cookie.value]).sort((a,b)=>String(a.slice(0,3)).localeCompare(String(b.slice(0,3))))])).digest('hex');},createView:({webPreferences})=>{const view=new WebContentsView({webPreferences});view.setBounds({x:0,y:0,width:1280,height:900});return view;},destroyView:view=>{if(!view.webContents.isDestroyed())view.webContents.close();},openVisible:url=>openInHub(url),emit:detail=>emit('context-platform-auth',detail),fetchText:createCourseFileFetch({session:providerSession}),readDocument:request=>desktopDocumentReader.read(request)});
 providerSession.cookies.on('changed',(_event,cookie)=>{if(!cookie.httpOnly&&!/session|token|auth|userid/i.test(cookie.name||''))return;const domain=String(cookie.domain||'').replace(/^\./,'');for(const [host,service] of Object.entries({'git.coco.study':'gitlab','th-koeln.sciebo.de':'sciebo','chat.coco.study':'mattermost'}))if(host===domain||host.endsWith('.'+domain))desktopPlatform.invalidate(service);});
 

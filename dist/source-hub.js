@@ -106,7 +106,7 @@ export function createSourceHub({getWorkspace,onChange=()=>{},onNotice=()=>{},on
       if(source.service!=='miro'&&action!=='read-file'&&Array.isArray(value.fileLinks)&&/^[a-f0-9]{64}$/.test(value.contentRevision||''))filePages.set(sourceId,{files:value.fileLinks.slice(0,50),contentRevision:value.contentRevision});
       states.set(sourceId,{state:'read'});changed();
       const results=(query?searchKnowledge(docs,query,5):docs.slice(0,5)).map(doc=>({id:doc.id,title:doc.title,text:doc.text.slice(0,1500),status:doc.status,url:doc.url,projectId:doc.projectId}));
-      return {documents:docs,result:{sourceId,service:source.service,coverage:action==='read-file'?value.coverage:record.coverage,results,totalDocuments:docs.length,contentRevision:value.contentRevision,hasMore:value.hasMore,nextOffset:value.nextOffset,links:(value.links||[]).slice(0,20),fileLinks:(value.fileLinks||[]).slice(0,10),warnings:record.warnings,complete:false}};
+      return {documents:docs,result:{sourceId,service:source.service,...(source.service==='miro'?{title:record.title}:{}),coverage:action==='read-file'?value.coverage:record.coverage,results,totalDocuments:docs.length,contentRevision:value.contentRevision,hasMore:value.hasMore,nextOffset:value.nextOffset,links:(value.links||[]).slice(0,20),fileLinks:(value.fileLinks||[]).slice(0,10),warnings:record.warnings,complete:false}};
     }catch(reason){if(reason.name!=='AbortError')states.set(sourceId,{state:'error',message:reason.message});else if(token===epoch)states.delete(sourceId);changed();throw reason;}
   }
   async function tool(name,args,signal,scope=''){

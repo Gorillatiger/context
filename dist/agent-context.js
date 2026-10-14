@@ -1,4 +1,5 @@
 import {notificationCourse} from './core.js';
+import {miroBoardURL} from './board-index.js';
 
 const viewNames={boards:'Miro-Boards',inventory:'Studio-Inventar',today:'Heute',browser:'Browser',calendar:'Kalender',companion:'Studienbegleiter',inbox:'Mitteilungen',projects:'Projekte',tasks:'Aufgaben',notes:'Notizen',links:'Ablage',mail:'TH-Mail',ai:'Hochschul-KI',imports:'Importieren',plugins:'Plugins',submissions:'Abgaben',tools:'Tools',settings:'Einstellungen'};
 
@@ -14,5 +15,8 @@ export function resolveAgentContext(workspace,updates,{view='today',projectId,no
   const name=workspace.projects.find(p=>p.id===scope)?.name||'Alle Projekte';
   const browserCurrent=(browser?.visible===true||view==='browser'&&browser?.current===true)&&browser?.readable===true;
   const label=projectId!==undefined?'Projekt · '+name:viewNames[view]||'Arbeitsbereich';
-  return {projectId:scope,projectName:name,label,browserCurrent};
+  // A Miro board in the active, shown browser tab. Only the normalized URL and tab title travel.
+  let currentBoard=null;
+  if((browser?.visible===true||view==='browser'&&browser?.current===true)&&browser?.miroBoard)try{currentBoard={url:miroBoardURL(browser.miroBoard.url),title:String(browser.miroBoard.title||'').replace(/[\u0000-\u001f\u007f]/g,'').trim().replace(/^miro$/i,'').slice(0,200)||'Miro-Board'};}catch{}
+  return {projectId:scope,projectName:name,label:currentBoard?'Miro-Board · '+currentBoard.title.slice(0,60):label,browserCurrent,...(currentBoard?{currentBoard}:{})};
 }

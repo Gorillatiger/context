@@ -6,6 +6,18 @@ const miroPage=value=>{try{const u=new URL(value);return u.protocol==='https:'&&
 const cancelled=()=>new MiroError('cancelled',499);
 
 /**
+ * Hidden views are not composited by Chromium, and Miro's board app never
+ * finishes loading without frames. An offscreen window renders into memory:
+ * nothing is shown, focusable or listed in the dock, yet the page initializes.
+ */
+export function miroOffscreenViews(BrowserWindow){
+  return {
+    createView:({webPreferences})=>{const window=new BrowserWindow({show:false,width:1280,height:900,focusable:false,skipTaskbar:true,paintWhenInitiallyHidden:true,webPreferences:{...webPreferences,offscreen:true}});window.webContents.setFrameRate?.(15);return window;},
+    destroyView:window=>{if(!window.isDestroyed?.())window.destroy();},
+  };
+}
+
+/**
  * Reads one public board as a visitor in a hidden view of the website
  * partition. Only miro.com may load in the main frame; no popups, downloads or
  * typed input. One board at a time; unchanged overviews reuse the parsed result.

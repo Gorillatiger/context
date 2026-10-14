@@ -77,7 +77,9 @@ export function parseMiroOverview(snapshot,{url,meta={},now=()=>new Date().toISO
   const boardTitle=miroPlainText(meta.title,240)||clean(value.title.replace(/\s+-\s+Miro$/,''),240)||'Miro-Board';
   const board={...target,title:boardTitle,description:'',createdBy:{id:'',name:miroPlainText(meta.author,200)},createdAt:'',modifiedBy:{id:'',name:''},modifiedAt:''};
   const items=[],byIndex=new Map();
-  for(const box of [...containers.values()].sort((a,b)=>a.index-b.index)){
+  // Frames (usually the slides) first in board order, then loose groups/elements.
+  const rank=box=>rows[box.index].kind==='frame'?0:1;
+  for(const box of [...containers.values()].sort((a,b)=>rank(a)-rank(b)||a.index-b.index)){
     const row=rows[box.index],frame=row.kind==='frame',title=frame?row.text.slice(0,240):'';
     if(!box.lines.length&&!title)continue;
     if(items.length===L.items){truncated=true;break;}
