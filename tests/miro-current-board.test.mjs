@@ -94,3 +94,12 @@ test('a fresh assignment is confirmed only after a successful read and released 
     platform:async()=>{throw Object.assign(new Error('Dieses Miro-Board ist für Besucher nicht freigegeben.'),{code:'no_access'});},complete:(()=>{const replies=[tool('read_current_board'),answer()];return async()=>replies.shift();})()});
   assert.deepEqual(events,['undo']);assert.match(run.steps[0].detail,/nicht freigegeben/);
 });
+
+test('an answer without ids links only board sections it names exactly, never invented ones',async()=>{
+  let run=await agentRun({replies:[tool('read_current_board'),answer('Auf der Folie Personas sollst du zwei Personas erstellen.',[])]});
+  assert.deepEqual(run.result.citations.map(doc=>doc.title),['Personas']);assert.equal(run.result.citations[0].url,OPEN+'?moveToWidget=3074457');
+  run=await agentRun({replies:[tool('read_current_board'),answer('Das Board behandelt Nutzerforschung allgemein.',[])]});
+  assert.deepEqual(run.result.citations,[]);
+  run=await agentRun({pageContext:{},replies:[answer('Personas sind hilfreich.',[])]});
+  assert.deepEqual(run.result.citations,[]);
+});
