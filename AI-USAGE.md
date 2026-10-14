@@ -38,6 +38,10 @@ Nach 15 Sekunden einer tatsächlich abgesendeten, noch laufenden Hochschul-KI-An
 
 Prüfungen verwenden künstliche Uhr und Timer: rollendes Fenster, parallele Reservierungen, Abbruch und verspätete Antwort, Timerfreigabe, 429 ohne Wiederholung, busy ohne Wartezeit, OpenRouter-/Local-Pfade, tatsächlicheChat-UI mit explizitemSwitch/Entwurf/keinSend. Kein echter Cloudlasttest mit elf Anfragen ausgeführt.
 
+## Wechsel-Hinweis bei Hochschul-KI
+
+Scheitert eine Anfrage bei KI:connect NRW, weil sie zu groß ist, zu lange dauert oder ein Limit greift (Chat zu lang, Anfrage oder Antwort zu groß, Zeitüberschreitung, erreichtes Limit), zeigt die Fehlermeldung zwei Buttons: **Zu OpenRouter wechseln** und **Zu Lokales Modell wechseln**. Der Wechsel geschieht nie automatisch, weil Kursinhalte sonst an einen anderen Anbieter gingen. Dein Text steht nach dem Wechsel als Entwurf bereit; es startet ein neuer Chat, der bisherige bleibt im Verlauf. Bei OpenRouter und lokalen Modellen, bei anderen Fehlern (z. B. „Modell nicht verfügbar“) und beim eigenen Stoppen erscheint der Kasten nie. Beim Zehn-pro-Minute-Limit zeigt der Wartehinweis mit Countdown bereits den Wechsel zu OpenRouter; dann gibt es keinen zweiten Kasten. Die Entscheidung liegt in `dist/provider-hint.js`, die Buttons in `dist/ki.js`; die Fehlercodes reicht `dist/ai-client.js` durch. Noch nicht gebaut: ein Hinweis vor dem Senden, wenn eine Aufgabe sehr groß aussieht.
+
 ## Rückfragen und Aktualität (Assistent)
 
 - **Rückfragen:** Das Werkzeug `ask_user` zeigt 2 bis 6 Auswahlfelder (Checkboxen bei Mehrfachauswahl, sonst Auswahlknöpfe) plus ein Feld „Anderes“; die erste Option ist die Empfehlung des Assistenten. Gefragt wird nur, wenn die Antwort das Ergebnis wesentlich ändert und sich nicht durch Lesen klären lässt, höchstens einmal je Auftrag und nie direkt nach einer Antwort (`allowAsk`). Die Auswahl geht als normale Nachricht „Meine Auswahl zu deiner Rückfrage: …“ weiter; der Entwurf im Eingabefeld bleibt erhalten. Beantwortete und unbeantwortete Rückfragen bleiben im Chatarchiv.
