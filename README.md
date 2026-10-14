@@ -2,7 +2,7 @@
 
 Ein lokaler Studien-Hub für Code & Context an der TH Köln. Kurse, Aufgaben, Notizen, Quellen, Mail und Kalender stehen in einer Oberfläche bereit. Ein KI-Begleiter kann freigegebene Quellen lesen und Antworten mit Quellenlinks liefern.
 
-**Stand: 0.18.0.** Entwicklungsprojekt, keine offizielle Anwendung der TH Köln. Integrationen benötigen eine eigene Anmeldung und gegebenenfalls eigene API-/OAuth-Konfiguration; ein Link allein ist noch kein verbundener Connector.
+**Stand: 0.18.1.** Entwicklungsprojekt, keine offizielle Anwendung der TH Köln. Integrationen benötigen eine eigene Anmeldung und gegebenenfalls eigene API-/OAuth-Konfiguration; ein Link allein ist noch kein verbundener Connector.
 
 ## Starten
 
@@ -36,7 +36,7 @@ Der interaktive Start mit optionalen Connector-Zugangsdaten erfolgt über `pytho
 | Kommunikation | Nachrichtenübersicht, Kursfilter, TH-Mail über IMAP/SMTP, Outlook/Gmail über eine konfigurierte Nango-Verbindung |
 | Kalender | Tag, Monat und Agenda, ICS-Import/Export, Anbieterabgleich mit stabilen IDs; kein allgemeiner Zweiwege-Sync sämtlicher Anbieter |
 | KI | KI:connect NRW, OpenRouter und lokale OpenAI-kompatible Modelle über LM Studio/Ollama; begrenzte Werkzeuge und Quellenbelege |
-| KI-Limit | OpenRouter-Schlüsselbudget und Gratiszähler; Hochschul-KI zeigt unbekannte Limits ehrlich an, lokale Modelle haben kein Cloud-Kontingent |
+| KI-Limit | OpenRouter-Schlüsselbudget und Gratiszähler; Hochschul-KI: 10 Anfragen/Minute mit Warteanzeige; übrige Kontingente bleiben unbekannt, lokale Modelle haben kein Cloud-Kontingent |
 | Sprache | Offline-Transkription mit whisper.cpp und Silero VAD nach Modelldownload; Zwischenstand, Stoppen, Abbruch und bearbeitbarer Entwurf |
 | Browser | Electron/Chromium, gemeinsame lokale Dienstsitzung, Kursansichten, Inventar und optionaler WhatsApp-CoCo-Filter |
 | Darstellung | Hell-/Darkmode, responsive Oberfläche und kompakter Kontextassistent |

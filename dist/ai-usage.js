@@ -14,6 +14,7 @@ export function usageSummary({provider,value,loading,error,model=''}={}){
   if(error)return {text:'Limit nicht abrufbar',warning:true};
   if(!value)return {text:'Limit unbekannt',warning:false};
   if(provider==='local')return {text:'Kein Cloud-Limit',warning:false};
+  if(provider==='kiconnect')return {text:'10 Anfragen / Minute',warning:value.rateLimit?.remaining===0};
   const requests=free(value.freeRequests),chosen=budget(value.effectiveBudget)||budget(value.keyBudget);
   if(provider==='openrouter'&&model.endsWith(':free')&&requests)return {text:requests.remaining.toLocaleString('de-DE')+' / '+requests.limit.toLocaleString('de-DE')+' frei',warning:requests.remaining===0};
   if(provider==='openrouter'&&chosen)return {text:money(Math.max(0,chosen.remaining))+' Restbudget',warning:chosen.remaining<=0};
@@ -24,7 +25,7 @@ export function renderUsagePanel(state){
   const value=state.value,provider=state.provider,rows=[];
   const line=(label,text)=>rows.push(`<div><dt>${escape(label)}</dt><dd>${escape(text)}</dd></div>`);
   if(provider==='local')line('Verarbeitung','Lokal · kein Cloud-Kontingent');
-  else if(provider==='kiconnect')line('Kontingent','Über diese API nicht verfügbar');
+  else if(provider==='kiconnect'){line('Minutenlimit','10 Modellaufrufe');const rate=value?.rateLimit;if(rate?.limit===10&&rate.windowMs===60000&&rate.scope==='local-process'&&count(rate.used)&&rate.used<=10)line('Hier erfasst',rate.used+' / 10');line('Weitere Kontingente','Über diese API nicht verfügbar');}
   else if(value){
     const effective=budget(value.effectiveBudget),key=budget(value.keyBudget),requests=free(value.freeRequests);
     if(effective){line('Wirksames Budget',money(effective.limit));line('Restbudget',money(Math.max(0,effective.remaining)));if(number(effective.used))line('Im Budget verbraucht',money(effective.used));if(periods[effective.resetInterval])line('Zeitraum',periods[effective.resetInterval]);if(typeof effective.resetsAt==='string'&&Number.isFinite(Date.parse(effective.resetsAt)))line('Zurückgesetzt ab',new Date(effective.resetsAt).toLocaleString('de-DE'));}
@@ -37,7 +38,7 @@ export function renderUsagePanel(state){
   let meter='';const selected=budget(value?.effectiveBudget)||budget(value?.keyBudget);
   if(provider==='openrouter'&&selected&&selected.limit>0){const percent=Math.max(0,Math.min(100,100*selected.remaining/selected.limit));meter=`<meter min="0" max="100" value="${percent}" aria-label="Verbleibender Anteil des Budgets">${Math.round(percent)} %</meter>`;}
   const checked=provider==='openrouter'&&value?.status==='available'&&typeof value.checkedAt==='string'&&Number.isFinite(Date.parse(value.checkedAt))?new Date(value.checkedAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
-  const notice=provider==='openrouter'?'Budget des Schlüssels/der Organisation, kein Kontoguthaben. Modellanbieter können zusätzlich begrenzen. Kostenfreie Zähler gelten für :free-Varianten; BYOK/ausgenommene Konten können abweichen.':provider==='kiconnect'?'KI:connect zählt API und Webnutzung gemeinsam. Den verbleibenden Betrag liefert die dokumentierte API derzeit nicht.':'Dein Rechner und Modellserver können eigene Grenzen haben.';
+  const notice=provider==='openrouter'?'Budget des Schlüssels/der Organisation, kein Kontoguthaben. Modellanbieter können zusätzlich begrenzen. Kostenfreie Zähler gelten für :free-Varianten; BYOK/ausgenommene Konten können abweichen.':provider==='kiconnect'?'10 pro Minute ist die angegebene Hochschulgrenze. Ein Agentenauftrag kann mehrere Modellaufrufe benötigen. Hier erfasst zählt nur diesen lokalen Connector; andere Apps und die Hochschul-Webnutzung sind nicht enthalten. Bei längerer Wartezeit kannst du ausdrücklich zu OpenRouter wechseln.':'Dein Rechner und Modellserver können eigene Grenzen haben.';
   return `<div class="ki-menu-heading"><h2 id="ki-usage-title">Nutzung & Limit</h2><div class="ki-usage-actions"><button type="button" id="ki-usage-refresh" class="ki-icon-action" data-ki-action="usage-refresh" aria-label="Nutzungslimit aktualisieren" title="Nutzungslimit aktualisieren" ${state.loading?'disabled':''}>${refreshIcon}</button><button type="button" id="ki-usage-close" class="ki-icon-action" data-ki-action="menu-close" aria-label="Limitanzeige schließen" title="Limitanzeige schließen"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div></div>${meter}<dl class="ki-usage-values">${rows.join('')}</dl>${state.loading?'<p class="ki-usage-note" role="status">Wird aktualisiert …</p>':''}${state.error?`<p class="ki-usage-error" role="status">${escape(state.error)}</p>`:''}<p class="ki-usage-note">${escape(notice)}</p>${checked?`<p class="ki-usage-note">Anbieterstand ${escape(checked)} · kann verzögert sein</p>`:''}`;
 }
 export function createAIUsage({provider='kiconnect',request,onChange=()=>{}}={}){

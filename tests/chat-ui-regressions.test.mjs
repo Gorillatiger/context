@@ -44,7 +44,7 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(resolve=>setImmedia
 function replaceGlobal(t,key,value){const old=Object.getOwnPropertyDescriptor(globalThis,key);Object.defineProperty(globalThis,key,{configurable:true,writable:true,value});t.after(()=>{if(old)Object.defineProperty(globalThis,key,old);else delete globalThis[key];});}
 
 
-function fixture(t,{ai,usageRequest,models=true,speechInstalled=true,platformSources=[],onPlatform,workspacePatch={}}={}){
+function fixture(t,{ai,usageRequest,models=true,speechInstalled=true,platformSources=[],onPlatform,workspacePatch={},requestAI}={}){
  const document=createFixtureDocument(),events=new Map(),calls=[],speechCalls=[],sources=[],notes=[],saved=new Map([['context-ai-provider','local']]);let view,compact=false,paints=0,callback,captureStarts=0,captureCloses=0;
  const window={addEventListener(type,handler){events.set(type,[...(events.get(type)||[]),handler]);},removeEventListener(type,handler){events.set(type,(events.get(type)||[]).filter(next=>next!==handler));},dispatchEvent(event){for(const handler of events.get(event.type)||[])handler(event);return true;},contextDesktop:{
   ai:async message=>{calls.push(message);if(message.action==='models')return models?{ok:true,value:{models:Array.isArray(models)?models:[{id:'synthetic-model'}]}}:{ok:false,error:'Synthetic model offline'};if(message.action==='cancel')return {ok:true,value:{}};if(message.action==='usage')return usageRequest?usageRequest(message):{ok:true,value:{provider:message.provider,status:message.provider==='local'?'not_applicable':'unknown'}};return ai?ai(message):{ok:true,value:{content:JSON.stringify({type:'answer',text:'Synthetic answer',citations:[]})}};},
@@ -56,7 +56,7 @@ function fixture(t,{ai,usageRequest,models=true,speechInstalled=true,platformSou
  replaceGlobal(t,'document',document);replaceGlobal(t,'window',window);replaceGlobal(t,'localStorage',{getItem:key=>saved.get(key)??null,setItem:(key,value)=>saved.set(key,value)});replaceGlobal(t,'indexedDB',undefined);replaceGlobal(t,'fetch',async()=>{throw new Error('Network forbidden in chat UI fixture');});replaceGlobal(t,'getComputedStyle',()=>({overflowY:'auto'}));
  const workspace={activeCourse:'alpha',projects:[{id:'alpha',name:'Synthetic course',links:[]}],notes:[{id:'note',projectId:'alpha',title:'Synthetic course note',content:'Source content for QA.'}],tasks:[],bookmarks:[],calendarEvents:[],...workspacePatch};
  const mount=()=>{paints++;document.mount(view.render({compact}));};
- view=createKIView({onChange:()=>{if(view)mount();},getContext:()=>({workspace,updates:[],platformSources}),onPlatform,onSource:value=>sources.push(value),onNote:value=>notes.push(value),speechCaptureFactory:async()=>({start:async()=>{captureStarts++;},close:async()=>{captureCloses++;}})});
+ view=createKIView({onChange:()=>{if(view)mount();},getContext:()=>({workspace,updates:[],platformSources}),onPlatform,onSource:value=>sources.push(value),onNote:value=>notes.push(value),speechCaptureFactory:async()=>({start:async()=>{captureStarts++;},close:async()=>{captureCloses++;}}),...(requestAI?{requestAI}:{})});
  mount();
  const find=selector=>{const node=document.querySelector(selector);assert(node,`missing actual rendered selector ${selector}`);return node;};
  return {view,document,calls,speechCalls,sources,notes,find,workspace,mount,async ready(){await settle();await view.load();await settle();},compact(value){compact=value;mount();},click:selector=>find(selector).click(),input(value){const node=find('#ki-prompt');node.value=value;document.dispatch('input',node);return node;},change(selector,value){const node=find(selector);if(node.type==='checkbox')node.checked=value;else node.value=value;document.dispatch('change',node);return node;},emitSpeech(detail){callback?.({type:'context-speech',detail});},get paints(){return paints;},get captureStarts(){return captureStarts;},get captureCloses(){return captureCloses;}};
@@ -195,4 +195,17 @@ test('provider change clears the old dollar budget before the next model discove
  let pending;const f=fixture(t,{usageRequest:async message=>({ok:true,value:message.provider==='openrouter'?{provider:'openrouter',status:'available',keyBudget:{limit:10,remaining:5,resetInterval:null}}:{provider:message.provider,status:'unknown'}})});await f.ready();
  f.click('#ki-menu-settings');f.change('#ki-provider','openrouter');await settle();assert.match(f.find('#ki-usage-toggle').textContent,/5,00 US\$/);
  f.change('#ki-provider','kiconnect');assert.equal(f.view.configuration().provider,'kiconnect');assert.doesNotMatch(f.find('#ki-usage-toggle').textContent,/US\$|Cloud-Limit/);await settle();assert.match(f.find('#ki-usage-toggle').textContent,/Limit unbekannt/);
+});
+
+test('campus wait hint switches explicitly, cancels the old run and preserves the question without auto-sending',async t=>{
+ const calls=[];let chatSignal;
+ const f=fixture(t,{requestAI:async(provider,action,options={})=>{calls.push({provider,action,body:options.body});if(action==='models')return {models:[{id:'synthetic-model'}]};if(action==='usage')return {provider,status:'unknown'};chatSignal=options.signal;options.onWait({provider:'kiconnect',reason:'rate',retryAfterMs:53000});return new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Abgebrochen','AbortError')),{once:true}));}});
+ await f.ready();f.change('#ki-provider','kiconnect');await settle();f.input('Welche Aufgaben sind im Kurs offen?');f.document.dispatch('submit',f.find('#ki-form'));await settle();
+ assert.match(f.find('.ki-wait-notice').textContent,/53 s/);assert.equal(f.find('.ki-wait-notice').getAttribute('role'),'status');assert.match(f.find('.ki-wait-notice').textContent,/Kosten/);
+ f.click('[data-ki-action="switch-openrouter"]');await settle();assert.equal(chatSignal.aborted,true);assert.equal(f.view.configuration().provider,'openrouter');assert.equal(f.find('#ki-prompt').value,'Welche Aufgaben sind im Kurs offen?');assert.equal(calls.filter(c=>c.action==='chat').length,1);assert.equal(calls.filter(c=>c.action==='chat'&&c.provider==='openrouter').length,0);assert.equal(f.document.querySelector('.ki-wait-notice'),null);
+});
+
+test('stopping a campus wait removes the hint and never switches providers',async t=>{
+ const f=fixture(t,{requestAI:async(provider,action,options={})=>{if(action==='models')return {models:[{id:'synthetic-model'}]};if(action==='usage')return {provider,status:'unknown'};options.onWait({provider,reason:'slow',elapsedMs:15000});return new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Abgebrochen','AbortError')),{once:true}));}});
+ await f.ready();f.change('#ki-provider','kiconnect');await settle();f.input('Eine Frage.');f.document.dispatch('submit',f.find('#ki-form'));await settle();assert.match(f.find('.ki-wait-notice').textContent,/Ursache.*unbekannt/);f.click('[data-ki-action="stop"]');await settle();assert.equal(f.view.configuration().provider,'kiconnect');assert.equal(f.document.querySelector('.ki-wait-notice'),null);assert.equal(f.view.isBusy(),false);
 });

@@ -142,3 +142,6 @@ body.ai-active .context-agent-launcher { display: none; }
   .context-agent-panel .ki-chat-menu { top: 54px; }
   .ki-chat .ki-message-actions { flex-direction: row; }
 }
+
+.ki-wait-notice{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:12px 18px;background:var(--coco-rose);color:var(--ink);border-top:1px solid var(--line);font-size:12px;line-height:1.5;flex-shrink:0;max-height:140px;overflow:auto}.ki-wait-notice>span{flex:1;min-width:150px}.ki-wait-notice>button{min-height:36px}.ki-wait-notice>small{flex-basis:100%;color:var(--muted);font-size:11px}
+@media(max-width:600px){.ki-wait-notice{padding:10px 12px}.ki-wait-notice>button{min-height:44px}}

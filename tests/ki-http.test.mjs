@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {once} from 'node:events';
+import {once,EventEmitter} from 'node:events';
 import {createRequestHandler} from '../server.mjs';
-import {createKIClient} from '../connectors/ki.mjs';
+import {createKIClient,KIError} from '../connectors/ki.mjs';
 
 test('KI HTTP route requires a local session, exact Origin and explicit JSON request; output has no credential',{timeout:10000},async()=>{
   let providerCalls=0;
@@ -47,4 +47,32 @@ test('KI HTTP disconnect aborts the active provider request',{timeout:7000},asyn
     const pending=fetch(origin+'/api/ai/chat',{method:'POST',headers:{Cookie:cookie,Origin:origin,'Content-Type':'application/json','X-Context-Request':'ki-request'},body:'{}',signal:controller.signal});
     await ready;controller.abort();await assert.rejects(pending);await cancelled;
   }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+});
+
+test('KI HTTP errors whitelist bounded numeric retry metadata and never serialize provider bodies or credentials',async()=>{
+  class ResponseMock extends EventEmitter{
+    destroyed=false;writableEnded=false;status=0;headers={};body='';
+    writeHead(status,headers){this.status=status;this.headers=headers;}
+    end(body=''){this.body=String(body);this.writableEnded=true;}
+  }
+  let failure;
+  const handler=createRequestHandler(()=>4386,async()=>({items:[],sources:[]}),{complete:async()=>{throw failure;}});
+  async function request(url,{cookie,body}={}){
+    const res=new ResponseMock(),req={url,method:body?'POST':'GET',headers:{host:'127.0.0.1:4386',...(cookie?{cookie}:{}),origin:'http://127.0.0.1:4386','content-type':'application/json','x-context-request':'ki-request'},
+      async *[Symbol.asyncIterator](){if(body)yield Buffer.from(JSON.stringify(body));}};
+    await handler(req,res);return res;
+  }
+  const cookie=(await request('/')).headers['Set-Cookie'].split(';')[0];
+  for(const [delay,expected] of [[12500,12500],[0,1000],[1.5,1000],[120000,60000],['10000',undefined],[-1,undefined],[Infinity,undefined],[NaN,undefined],[null,undefined],[{},undefined]]){
+    failure=new KIError(429,'provider_limit','PRIVATE_PROVIDER_BODY synthetic-secret');
+    Object.assign(failure,{retryAfterMs:delay,key:'synthetic-secret',headers:{Authorization:'Bearer synthetic-secret'},body:'PRIVATE_PROVIDER_BODY'});
+    const response=await request('/api/ai/chat',{cookie,body:{model:'fixture',messages:[{role:'user',content:'test'}]}}),value=JSON.parse(response.body);
+    assert.equal(response.status,429);assert.equal(value.code,'provider_limit');assert.equal(value.error,'provider_limit');
+    assert.equal(value.retryAfterMs,expected);assert.doesNotMatch(response.body,/PRIVATE_PROVIDER_BODY|synthetic-secret|Authorization|headers/);
+    assert.ok(Object.keys(value).every(key=>['error','code','message','retryAfterMs'].includes(key)));
+  }
+  failure=Object.assign(new Error('PRIVATE_INTERNAL_BODY'),{code:'provider_limit',status:429,retryAfterMs:2000,key:'synthetic-secret'});
+  const response=await request('/api/ai/chat',{cookie,body:{}}),value=JSON.parse(response.body);
+  assert.equal(response.status,502);assert.equal(value.code,'unavailable');assert.equal(Object.hasOwn(value,'retryAfterMs'),false);
+  assert.doesNotMatch(response.body,/PRIVATE_INTERNAL_BODY|synthetic-secret/);
 });

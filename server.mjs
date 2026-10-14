@@ -16,6 +16,13 @@ const defaultOpenRouter=createKIClient({provider:'openrouter'});
 const defaultMail=createMailClient();
 const apiHeaders={'Content-Type':'application/json','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'"};
 const json=(res,status,value)=>{res.writeHead(status,apiHeaders);res.end(JSON.stringify(value));};
+function aiErrorBody(error){
+  const known=error instanceof KIError&&typeof error.code==='string'&&/^[a-z][a-z0-9_]{0,63}$/.test(error.code);
+  const code=known?error.code:'unavailable',limited=known&&error.status===429&&['local_limit','provider_limit'].includes(code);
+  return {error:code,code,message:limited?'Das KI-Anfragelimit ist erreicht. Bitte kurz warten.':known?error.message:'Die KI-Verbindung ist gerade nicht verfügbar.',
+    ...(limited&&typeof error.retryAfterMs==='number'&&Number.isFinite(error.retryAfterMs)&&error.retryAfterMs>=0?
+      {retryAfterMs:Math.ceil(Math.max(1000,Math.min(60000,error.retryAfterMs)))}:{})};
+}
 async function chatBody(req,limit=512000){
   const declared=Number(req.headers['content-length']||0);
   if(!Number.isSafeInteger(declared)||declared<0||declared>limit)throw new KIError(413,'body_limit','Die Anfrage ist zu groß.');
@@ -130,7 +137,7 @@ return async (req, res) => {
             return;
           }
           res.writeHead(404);return res.end();
-        }catch(error){if(!res.destroyed)return json(res,error instanceof KIError?error.status:502,{error:error instanceof KIError?error.code:'unavailable',message:error instanceof KIError?error.message:'Die KI-Verbindung ist gerade nicht verfügbar.'});return;}
+        }catch(error){if(!res.destroyed)return json(res,error instanceof KIError?error.status:502,aiErrorBody(error));return;}
       }
       if(pathname!=='/api/notifications'){res.writeHead(404);return res.end();}
       const manualRefresh=new URL(req.url,'http://localhost').searchParams.get('refresh')==='1';

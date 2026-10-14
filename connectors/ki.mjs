@@ -2,10 +2,25 @@ import {createHash} from 'node:crypto';
 import {normalizeOpenRouterUsage} from './ai-usage.mjs';
 
 const BASE='https://chat.kiconnect.nrw/api/v1';
+const REQUEST_LIMIT=10,REQUEST_WINDOW=60000;
 export const AI_PROVIDERS={kiconnect:{name:'KI:connect NRW',base:BASE},openrouter:{name:'OpenRouter',base:'https://openrouter.ai/api/v1'}};
 export class KIError extends Error {
   constructor(status,code,message){super(message);this.status=status;this.code=code;}
 }
+function limitError(code,message,retryAfterMs){
+  const error=new KIError(429,code,message);
+  error.retryAfterMs=Math.ceil(Math.max(1000,Math.min(REQUEST_WINDOW,retryAfterMs)));
+  return error;
+}
+function providerRetryAfter(value,current){
+  if(typeof value!=='string'||value.length>128)return REQUEST_WINDOW;
+  const text=value.trim();let delay;
+  if(/^\d+$/.test(text))delay=Number(text)*1000;
+  else if(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(text))delay=Date.parse(text)-current;
+  return Number.isFinite(delay)?Math.ceil(Math.max(1000,Math.min(REQUEST_WINDOW,delay))):REQUEST_WINDOW;
+}
+function cancelled(signal){if(signal?.aborted)throw new KIError(499,'cancelled','Anfrage abgebrochen.');}
+function cancelResponse(response){try{void response.body?.cancel().catch(()=>{});}catch{}}
 export async function readKIKey(env=process.env){
   const key=env.KICONNECT_API_KEY?.trim();
   if(key&&key.length<=4096&&!/[\r\n]/.test(key))return {key,storage:'session'};
@@ -40,18 +55,28 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
   let cachedModels=null,cachedKey='',cachedAt=0,active=false,sessionCredential=null;
   let usageCache=null,usagePending=null,usageRevision=0;
   let requests=[];
+  function localRateLimit(){
+    const current=now();requests=requests.filter(at=>current-at<REQUEST_WINDOW);
+    const used=Math.min(REQUEST_LIMIT,requests.length),remaining=REQUEST_LIMIT-used;
+    return {limit:REQUEST_LIMIT,windowMs:REQUEST_WINDOW,used,remaining,
+      retryAfterMs:remaining?0:Math.ceil(Math.max(1000,Math.min(REQUEST_WINDOW,Math.min(...requests)+REQUEST_WINDOW-current))),
+      scope:'local-process',basis:'user-provided'};
+  }
+  function requireRateCapacity(){const rate=localRateLimit();if(!rate.remaining)throw limitError('local_limit','Bitte kurz warten. Höchstens zehn KI-Anfragen pro Minute.',rate.retryAfterMs);}
   const fingerprint=key=>createHash('sha256').update(key).digest('hex');
   const invalidateUsage=()=>{usageRevision++;usageCache=null;usagePending?.controller.abort();usagePending=null;};
   const currentCredential=async()=>sessionCredential||await getKey();
   async function credential(){const result=await currentCredential();if(!result?.key)throw new KIError(503,'not_configured',name+' ist noch nicht eingerichtet. Verbinde deinen API-Schlüssel in dieser Ansicht.');return result;}
   async function request(path,key,body,signal){
     try{
+      cancelled(signal);
       const response=await fetcher(config.base+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+key,Accept:'application/json',...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(body?60000:15000),...(signal?[signal]:[])])});
-      if(response.redirected||response.url&&response.url!==config.base+path){await response.body?.cancel().catch(()=>{});throw new KIError(502,'redirect_blocked','Die KI-Verbindung hat eine gesperrte Weiterleitung versucht.');}
+      if(signal?.aborted){cancelResponse(response);cancelled(signal);}
+      if(response.redirected||response.url&&response.url!==config.base+path){cancelResponse(response);throw new KIError(502,'redirect_blocked','Die KI-Verbindung hat eine gesperrte Weiterleitung versucht.');}
       if(!response.ok){
-        await response.body?.cancel().catch(()=>{});
+        cancelResponse(response);
         if([401,403].includes(response.status))throw new KIError(502,'access_denied',name+' hat den API-Zugriff abgelehnt. Schlüssel und Berechtigung prüfen.');
-        if(response.status===429)throw new KIError(429,'provider_limit','Das '+name+'-Limit ist erreicht. Bitte später erneut versuchen.');
+        if(response.status===429)throw limitError('provider_limit','Das '+name+'-Limit ist erreicht. Bitte später erneut versuchen.',providerRetryAfter(response.headers?.get('retry-after'),now()));
         if(response.status===402)throw new KIError(402,'credits_required','Das OpenRouter-Guthaben reicht nicht aus. Bitte dein Konto prüfen.');
         throw new KIError(502,'provider_error',name+' konnte die Anfrage nicht beantworten. Bei OpenRouter muss das Modell einen ZDR-Endpunkt anbieten. Bitte erneut versuchen oder ein anderes Modell wählen.');
       }
@@ -92,14 +117,19 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
       const requestedRevision=usageRevision,auth=await credential();
       if(signal?.aborted)throw new KIError(499,'cancelled','Limitabfrage abgebrochen.');
       if(requestedRevision!==usageRevision)throw new KIError(499,'usage_changed','Die KI-Verbindung wurde geändert. Limit erneut prüfen.');
-      if(provider==='kiconnect')return {provider,status:'unknown',checkedAt:new Date(now()).toISOString(),reason:'not_exposed'};
+      if(provider==='kiconnect')return {provider,status:'unknown',checkedAt:new Date(now()).toISOString(),reason:'not_exposed',rateLimit:localRateLimit()};
       const keyId=fingerprint(auth.key),revision=usageRevision,current=now();
       if(usageCache?.keyId===keyId&&usageCache.revision===revision&&current>=usageCache.at&&current-usageCache.at<30000)return structuredClone(usageCache.value);
       if(usagePending&&(usagePending.keyId!==keyId||usagePending.revision!==revision||usagePending.controller.signal.aborted)){usagePending.controller.abort();usagePending=null;}
       if(!usagePending){
         const record={keyId,revision,controller:new AbortController(),waiters:new Set(),done:false,promise:null};
         record.promise=Promise.resolve().then(async()=>{
-          const raw=await request('/key',auth.key,undefined,record.controller.signal);
+          let raw;
+          try{raw=await request('/key',auth.key,undefined,record.controller.signal);}
+          catch(error){
+            if(record.controller.signal.aborted||revision!==usageRevision)throw new KIError(499,'usage_changed','Die KI-Verbindung wurde geändert. Limit erneut prüfen.');
+            throw error;
+          }
           const currentAuth=await currentCredential();
           if(record.controller.signal.aborted||revision!==usageRevision||!currentAuth?.key||fingerprint(currentAuth.key)!==keyId)throw new KIError(499,'usage_changed','Die KI-Verbindung wurde geändert. Limit erneut prüfen.');
           const value=normalizeOpenRouterUsage(raw,now());usageCache={keyId,revision,at:now(),value};return value;
@@ -111,8 +141,7 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
     async configure(value){
       if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>k!=='key')||typeof value.key!=='string'||!value.key.trim()||value.key.length>4096||/[\r\n]/.test(value.key))throw new KIError(400,'invalid_key','Bitte einen gültigen API-Schlüssel eingeben.');
       if(active)throw new KIError(429,'busy','Eine KI-Anfrage läuft bereits. Bitte kurz warten.');
-      requests=requests.filter(at=>now()-at<60000);
-      if(requests.length>=10)throw new KIError(429,'local_limit','Bitte kurz warten. Höchstens zehn KI-Anfragen pro Minute.');
+      requireRateCapacity();
       active=true;requests.push(now());
       try{
         const auth={key:value.key.trim(),storage:'session'};
@@ -129,12 +158,13 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
     },
     async complete(value,signal){
       const input=validateChat(value);
+      if(signal!==undefined&&!(signal instanceof AbortSignal))throw new KIError(400,'invalid_request','Ungültige KI-Anfrage.');
+      cancelled(signal);
       if(active)throw new KIError(429,'busy','Eine KI-Anfrage läuft bereits. Bitte kurz warten.');
-      requests=requests.filter(at=>now()-at<60000);
-      if(requests.length>=10)throw new KIError(429,'local_limit','Bitte kurz warten. Höchstens zehn KI-Anfragen pro Minute.');
+      requireRateCapacity();
       active=true;
       try{
-        const auth=await credential();const models=await modelsWithKey(auth,signal);
+        const auth=await credential();cancelled(signal);const models=await modelsWithKey(auth,signal);cancelled(signal);
         if(!models.some(m=>m.id===input.model))throw new KIError(400,'unknown_model','Dieses Modell ist nicht in deiner '+name+'-Modellliste.');
         requests.push(now());
         const result=await request('/chat/completions',auth.key,{...input,stream:false,...(provider==='openrouter'?{max_tokens:3000,provider:{data_collection:'deny',zdr:true}}:{})},signal);

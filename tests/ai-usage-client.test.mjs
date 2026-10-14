@@ -240,7 +240,8 @@ test('missing credentials, malformed signals and pre-abort cannot contact a clou
 test('KI:connect reports unknown quota without probing an unverified provider endpoint', async () => {
   let calls = 0;
   const client = createKIClient({ getKey: auth, now: () => 0, fetcher: async () => { calls++; throw new Error('forbidden'); } });
-  assert.deepEqual(await client.usage(), { provider: 'kiconnect', status: 'unknown', checkedAt: '1970-01-01T00:00:00.000Z', reason: 'not_exposed' });
+  assert.deepEqual(await client.usage(), { provider: 'kiconnect', status: 'unknown', checkedAt: '1970-01-01T00:00:00.000Z', reason: 'not_exposed',
+    rateLimit: { limit: 10, windowMs: 60000, used: 0, remaining: 10, retryAfterMs: 0, scope: 'local-process', basis: 'user-provided' } });
   assert.equal(calls, 0);
 });
 
