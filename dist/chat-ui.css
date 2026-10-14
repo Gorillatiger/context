@@ -182,3 +182,12 @@ body.ai-active .context-agent-launcher { display: none; }
 .ki-switch-hint p{margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--muted)}
 .ki-switch-hint strong{color:var(--ink)}
 .ki-switch-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* Effort weighing before a large task on the university model (above the composer) */
+.ki-chat .ki-effort { margin: 0 18px 10px; max-height: 50vh; overflow: auto; }
+.ki-chat .ki-effort legend { display: grid; gap: 3px; color: var(--ink); font-size: 13px; }
+.ki-chat .ki-effort legend small { font-size: 12px; color: var(--muted, #6b6b6b); line-height: 1.4; }
+.ki-chat .ki-effort .ki-clarify-option { padding: 8px 10px; }
+.ki-chat .ki-effort input[type=radio] { width: auto; height: auto; min-height: 0; flex: none; margin: 3px 0 0; padding: 0; }
+.ki-chat .ki-effort-actions { display: flex; align-items: center; gap: 14px; }
+@media (max-width: 600px) { .ki-chat .ki-effort { margin: 0 12px 8px; } }

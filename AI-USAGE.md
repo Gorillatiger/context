@@ -42,6 +42,16 @@ Prüfungen verwenden künstliche Uhr und Timer: rollendes Fenster, parallele Res
 
 Scheitert eine Anfrage bei KI:connect NRW, weil sie zu groß ist, zu lange dauert oder ein Limit greift (Chat zu lang, Anfrage oder Antwort zu groß, Zeitüberschreitung, erreichtes Limit), zeigt die Fehlermeldung zwei Buttons: **Zu OpenRouter wechseln** und **Zu Lokales Modell wechseln**. Der Wechsel geschieht nie automatisch, weil Kursinhalte sonst an einen anderen Anbieter gingen. Dein Text steht nach dem Wechsel als Entwurf bereit; es startet ein neuer Chat, der bisherige bleibt im Verlauf. Bei OpenRouter und lokalen Modellen, bei anderen Fehlern (z. B. „Modell nicht verfügbar“) und beim eigenen Stoppen erscheint der Kasten nie. Beim Zehn-pro-Minute-Limit zeigt der Wartehinweis mit Countdown bereits den Wechsel zu OpenRouter; dann gibt es keinen zweiten Kasten. Die Entscheidung liegt in `dist/provider-hint.js`, die Buttons in `dist/ki.js`; die Fehlercodes reicht `dist/ai-client.js` durch. Noch nicht gebaut: ein Hinweis vor dem Senden, wenn eine Aufgabe sehr groß aussieht.
 
+## Abwägen vor großen Aufgaben (Hochschul-KI)
+
+Bevor eine große Aufgabe an KI:connect NRW geht, schätzt Context den Aufwand lokal ein, ohne eine Modellanfrage zu verbrauchen. Anzeichen sind „alle/gesamte“, Zusammenfassen, Vergleichen oder Durchsuchen über mehrere Kurse ohne gewählten Kurs, Suche über Spaces und Plattformen, sehr lange Aufträge, viele Fragen auf einmal und lange Chats. Bei großer Aufgabe erscheint über dem Eingabefeld eine Auswahl mit Empfehlung:
+
+- **Zu OpenRouter wechseln:** Context wechselt und schickt dieselbe Frage dort ab. Ist OpenRouter noch nicht verbunden, steht die Frage nach dem Verbinden als Entwurf bereit.
+- **Eingegrenzt mit Hochschul-KI:** Gewählter Kurs, neueste Quellen, wenige Schritte, kurze Antwort; das Modell fragt nach, wenn mehr nötig ist.
+- **Trotzdem vollständig versuchen** oder **Auftrag noch ändern** (der Text bleibt stehen).
+
+Fragen zur offenen Seite („dieses Board“, „hier“) und kleine Fragen werden nie unterbrochen, OpenRouter und lokale Modelle auch nicht. Während der Arbeit weiß das Modell, dass es auf Hochschul-KI knapp ist: Wird die Aufgabe größer als gedacht, fragt es mit Auswahl nach (z. B. „Auf Kurs X eingrenzen“, „Zu OpenRouter wechseln“). Wählst du „Zu OpenRouter wechseln“, wechselt Context tatsächlich und stellt die ursprüngliche Frage dort. Erreicht ein Lauf die Schrittgrenze oder das Kontextbudget, erscheint der Wechsel-Kasten. Geprüft mit `npm run test:ki:effort` (echte Oberfläche, Modelle gescriptet).
+
 ## Rückfragen und Aktualität (Assistent)
 
 - **Rückfragen:** Das Werkzeug `ask_user` zeigt 2 bis 6 Auswahlfelder (Checkboxen bei Mehrfachauswahl, sonst Auswahlknöpfe) plus ein Feld „Anderes“; die erste Option ist die Empfehlung des Assistenten. Gefragt wird nur, wenn die Antwort das Ergebnis wesentlich ändert und sich nicht durch Lesen klären lässt, höchstens einmal je Auftrag und nie direkt nach einer Antwort (`allowAsk`). Die Auswahl geht als normale Nachricht „Meine Auswahl zu deiner Rückfrage: …“ weiter; der Entwurf im Eingabefeld bleibt erhalten. Beantwortete und unbeantwortete Rückfragen bleiben im Chatarchiv.
