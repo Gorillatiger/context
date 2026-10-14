@@ -30,7 +30,7 @@ const cookieValid=(header,name,sessionToken)=>{
   return /^[0-9a-f]{64}$/.test(value)&&timingSafeEqual(Buffer.from(value),Buffer.from(sessionToken));
 };
 export function validHost(host,port) { return host===`127.0.0.1:${port}`||host===`localhost:${port}`; }
-export function createRequestHandler(portProvider, collect=async()=>withSnapshot(await collectNotifications(process.env,{mailClient:defaultMail}),snapshotPath),ki=defaultKI,mail=defaultMail,openrouter=defaultOpenRouter,{now=Date.now}={}) {
+export function createRequestHandler(portProvider, collect=async()=>withSnapshot(await collectNotifications(process.env,{mailClient:defaultMail}),snapshotPath),ki=defaultKI,mail=defaultMail,openrouter=defaultOpenRouter,{now=Date.now,spaces=null}={}) {
 const sessionToken=randomBytes(32).toString('hex');
 let cachedFeed,cachedAt=0,pendingFeed,feedRevision=0;
 async function collectCurrentFeed(){
@@ -52,9 +52,19 @@ return async (req, res) => {
     if(!validHost(req.headers.host,port)){res.writeHead(403);return res.end('Host rejected');}
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     const mailActions=['connection','folders','list','message','attachment','attachment-link','flag','send'];
-    if(!['GET','HEAD'].includes(req.method)&&!(req.method==='POST'&&(['/api/ai/chat','/api/ai/connection'].includes(pathname)||mailActions.some(action=>pathname==='/api/mail/'+action)))){res.writeHead(405,{Allow:'GET, HEAD'});return res.end();}
+    if(!['GET','HEAD'].includes(req.method)&&!(req.method==='POST'&&(['/api/ai/chat','/api/ai/connection','/api/spaces/search','/api/spaces/read'].includes(pathname)||mailActions.some(action=>pathname==='/api/mail/'+action)))){res.writeHead(405,{Allow:'GET, HEAD'});return res.end();}
     if(pathname.startsWith('/api/')){
       if(!cookieValid(req.headers.cookie,cookieName,sessionToken)||req.headers['sec-fetch-site']==='cross-site'||req.headers.origin&&!['http://127.0.0.1:'+port,'http://localhost:'+port].includes(req.headers.origin))return json(res,403,{error:'session_expired',message:'Die lokale Sitzung ist nicht mehr gültig. Sichere offene Entwürfe und lade den Arbeitsbereich neu.'});
+      if(pathname.startsWith('/api/spaces/')){
+        if(pathname==='/api/spaces/status'&&req.method==='GET')return json(res,200,{configured:!!spaces,scope:'published'});
+        if(req.method!=='POST'||!['/api/spaces/search','/api/spaces/read'].includes(pathname))return json(res,405,{error:'invalid_method',message:'Nur lesende Spaces-Suchaufträge sind verfügbar.'});
+        if(req.headers['x-context-request']!=='spaces-search'||!req.headers['content-type']?.toLowerCase().startsWith('application/json')||new URL(req.url,'http://localhost').search)return json(res,400,{error:'invalid_request',message:'Ungültiger Spaces-Suchauftrag.'});
+        if(!spaces)return json(res,503,{error:'spaces_not_connected',message:'Spaces-Direktsuche benötigt die aktuelle Context-App oder eine autorisierte WordPress-Verbindung im Web-Backend. Browser-Cookies werden nicht übernommen.'});
+        const controller=new AbortController(),cancel=()=>controller.abort();req.on('aborted',cancel);res.on('close',()=>{if(!res.writableEnded)cancel();});
+        try{const body=await chatBody(req,4096);if(body.op!==pathname.slice('/api/spaces/'.length))return json(res,400,{error:'invalid_request',message:'Ungültiger Spaces-Suchauftrag.'});const result=await spaces.handle(body,{signal:controller.signal});if(!controller.signal.aborted)return json(res,200,result);}
+        catch(error){if(controller.signal.aborted)return;return json(res,400,{error:'spaces_search_failed',message:'Die Spaces-Anfrage konnte nicht abgeschlossen werden. Prüfe Anmeldung und Kurszugriff.'});}
+        finally{req.off('aborted',cancel);}return;
+      }
       if(pathname.startsWith('/api/mail/')){
         try{
           if(pathname.startsWith('/api/mail/download/')){

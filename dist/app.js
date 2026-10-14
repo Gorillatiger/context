@@ -3,6 +3,7 @@ import {createPlatformDiscovery} from './platform-discovery.js';
 import {captureInboxViewport,restoreInboxViewport} from './inbox-viewport.js';
 import {createFeedRefresh} from './feed-refresh.js';
 import {parseFeedSnapshot} from './feed-state.js';
+import {createSpacesSearchClient} from './spaces-search-client.js';
 import {createSearchView} from './search-view.js';
 import {createSpacesCrawlView} from './spaces-crawl-view.js';
 import {buildSearchDocuments} from './search-documents.js';
@@ -207,7 +208,8 @@ const platformDiscovery=createPlatformDiscovery({getWorkspace:()=>state,onCatalo
  if(state!==workspace)throw new Error('Der Arbeitsbereich wurde inzwischen geändert. Bitte die Kursseite erneut lesen.');
  const previous=state;state={...state,platformFindings};if(!save()){state=previous;return false;}return true;
 }});
-const kiView=createKIView({onChange:()=>{
+const spacesSearch=createSpacesSearchClient({getWorkspace:()=>state});
+const kiView=createKIView({onSpaces:(tool,args,signal)=>spacesSearch.tool(tool,args,signal),onChange:()=>{
   if(view!=='ai'){syncAgentContext();return;}
   const active=document.activeElement,id=active?.id,selection=(active instanceof HTMLTextAreaElement||active instanceof HTMLInputElement)&&active.selectionStart!==null?[active.selectionStart,active.selectionEnd,active.selectionDirection]:null;
   render();const replacement=id?document.getElementById(id):null;if(replacement){replacement.focus({preventScroll:true});if(selection&&typeof replacement.setSelectionRange==='function')replacement.setSelectionRange(...selection);}
@@ -251,12 +253,12 @@ const diaryView=createDevDiaryView({getState:()=>state,onNotice:toast,onChange:(
  modal.classList.add('dev-diary-modal');
  if(projectId)modal.dataset.projectId=projectId;syncAgentContext();
 }});
-window.contextDesktop?.onEvent?.(({type,detail})=>{if(type==='context-platform-auth')kiView.stop();if(type==='context-diary-reminder-open'&&state.devDiaries?.some(d=>d.id===detail?.diaryId)){setView('notes');diaryView.open(detail.diaryId,detail.date);}});
+window.contextDesktop?.onEvent?.(({type,detail})=>{if(type==='context-platform-auth')kiView.stop();if(type==='context-spaces-auth'){spacesSearch.invalidate();kiView.stop();}if(type==='context-diary-reminder-open'&&state.devDiaries?.some(d=>d.id===detail?.diaryId)){setView('notes');diaryView.open(detail.diaryId,detail.date);}});
 crawlerView=createSpacesCrawlView({dialog:modal,getWorkspace:()=>state,onModal:body=>{openModal(modalHead('Spaces indexieren','Kursseiten lokal durchsuchbar machen')+body,true);modal.classList.add('spaces-crawl-modal');modal.dataset.crawl='true';},onChange:invalidateSearch,onDiscovery:(page,scope)=>platformDiscovery.discover(page,scope),onSearch:()=>openSearch(),isOtherBusy:()=>kiView.isBusy()||companion.isBusy()||boardView.isBusy()});
 function allBrowserSources(){return [...(companion?.sources()||[]),...(crawlerView?.sources()||[])];}
-searchView=createSearchView({dialog:searchModal,getContext:()=>({workspace:state,sources:sourceStates}),getDocuments:getSearchDocuments,onOpen:openIndexedResult,onCrawl:()=>crawlerView.open(),onRefreshSources:options=>sourceHub.refresh(options),onAgentSearch:({query,projectId})=>{if(kiView.isBusy()){toast('Der Agent arbeitet gerade.');return;}state.activeCourse=projectId||'';save();kiView.scopeChanged();kiView.prefill('Suche in meinen verknüpften Kursquellen, lies passende Miro-Boards, Sciebo-Ordner und GitLab-Seiten und belege die Antwort: '+query);setView('ai');}});
+searchView=createSearchView({dialog:searchModal,getContext:()=>({workspace:state,sources:sourceStates}),getDocuments:getSearchDocuments,onOpen:openIndexedResult,onLiveSearch:options=>spacesSearch.search(options),onOpenLive:async item=>{try{const value=await spacesSearch.read({projectId:item.projectId,id:item.id});openModal(modalHead(value.title,'Spaces · direkt gelesen')+`<div class="markdown-content search-source-preview">${renderMarkdown(value.text,[])}</div>${value.hasMore?'<p class="subtle-note">Auszug. Den vollständigen Beitrag im Original öffnen.</p>':''}<div class="form-footer">${external(value.url,'Original öffnen','button primary')}</div>`);}catch(error){toast(error.message);}},onCrawl:()=>crawlerView.open(),onRefreshSources:options=>sourceHub.refresh(options),onAgentSearch:({query,projectId})=>{if(kiView.isBusy()){toast('Der Agent arbeitet gerade.');return;}state.activeCourse=projectId||'';save();kiView.scopeChanged();kiView.prefill('Suche in meinen verknüpften Kursquellen, lies passende Miro-Boards, Sciebo-Ordner und GitLab-Seiten und belege die Antwort: '+query);setView('ai');}});
 window.addEventListener('context-chat-saved',invalidateSearch);
-window.addEventListener('pagehide',event=>{if(event.persisted)crawlerView.pause();else{searchView.dispose();crawlerView.dispose();sourceHub.dispose();}});
+window.addEventListener('pagehide',event=>{if(event.persisted)crawlerView.pause();else{searchView.dispose();crawlerView.dispose();sourceHub.dispose();spacesSearch.dispose();}});
 const inventoryView=createInventoryView({onChange:()=>{if(view==='inventory')render();},onError:toast});
 function renderInventory(){return inventoryView.render();}
 function render() {
@@ -277,7 +279,7 @@ function render() {
     <button class="workspace" data-view="settings"><span class="workspace-avatar">C&C</span><span>Dein Arbeitsbereich<small>TH Köln · persönlich</small></span><span class="workspace-chevron">⌄</span></button>
     <p class="nav-label">ARBEITSBEREICH</p>
     <nav aria-label="Arbeitsbereich">${renderNavigation()}</nav>
-    <div class="sidebar-bottom"><button data-view="settings" class="nav-item ${view==='settings'?'active':''}">${icon('settings')}<span>Einstellungen</span></button><div class="profile"><span class="user-avatar">${esc(state.profile.name?state.profile.name.slice(0,1).toUpperCase():'C')}</span><span>${esc(state.profile.name || 'Dein persönlicher Hub')}<small>Code & Context</small></span><span class="version">v0.17.4</span></div></div>
+    <div class="sidebar-bottom"><button data-view="settings" class="nav-item ${view==='settings'?'active':''}">${icon('settings')}<span>Einstellungen</span></button><div class="profile"><span class="user-avatar">${esc(state.profile.name?state.profile.name.slice(0,1).toUpperCase():'C')}</span><span>${esc(state.profile.name || 'Dein persönlicher Hub')}<small>Code & Context</small></span><span class="version">v0.18.0</span></div></div>
   </aside>
   <div class="page-shell"><header class="topbar"><div class="breadcrumb"><button class="mobile-menu icon-button" data-action="menu" aria-label="Navigation öffnen" title="Navigation öffnen">${icon('menu')}</button><strong>${names[view]}</strong></div><label class="course-switch"><span>KURS</span><select id="course-switch" aria-label="Kurs auswählen" ${kiView.isBusy()?'disabled':''}>${courseOptions()}</select></label><button class="search-trigger" data-action="search" aria-label="Arbeitsbereich durchsuchen" title="Arbeitsbereich durchsuchen">${icon('search',17)}<span>Suche</span><kbd>⌘ K</kbd></button><button class="theme-toggle icon-button" type="button" data-action="toggle-theme" data-theme-toggle aria-label="Darkmode aktivieren" aria-pressed="false"><span class="theme-moon" aria-hidden="true">${icon('moon',18)}</span><span class="theme-sun" aria-hidden="true">${icon('sun',18)}</span></button><button class="inbox-trigger icon-button" data-view="inbox" aria-label="Posteingang öffnen${unread?', '+unread+' neue Hinweise':''}">${icon('bell',18)}${unread?'<span class="bell-dot"></span>':''}</button><span class="local-indicator"><span class="tiny-dot ${storageAvailable?'':'warning'}"></span>${storageAvailable?'Lokal gespeichert':'Nicht gespeichert'}</span></header>
   <main id="main" tabindex="-1">${({sources:()=>sourceHub.render(),connections:()=>nangoConnections.render(),boards:()=>boardView.render(),inventory:renderInventory,today:renderToday,calendar:()=>calendarView.render(),companion:()=>companion.render(),browser:()=>browserView.render(),inbox:renderInbox,mail:()=>mailView.render(),projects:renderProjects,tasks:renderTasks,links:renderBookmarks,notes:renderNotes,ai:()=>floatingOpen?heading('DEIN KONTEXTASSISTENT','Chat im Panel','',`<button class="button secondary" data-action="context-agent">${icon('star',17)} Chat hier anzeigen</button>`):kiView.render(),imports:renderImports,plugins:renderPlugins,submissions:renderSubmissions,tools:renderTools,settings:renderSettings}[view])()}</main>

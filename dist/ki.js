@@ -17,7 +17,7 @@ const labels={full:'Vollständiger Text',excerpt:'Auszug',metadata:'Nur Kopfzeil
 const chatIcons={new:'<path d="M12 5v14M5 12h14"/>',history:'<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7M12 7v5l3 2"/>',settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',attach:'<path d="m8 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9M6 14l8-8"/>',mic:'<rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/>',send:'<path d="M12 20V4m-7 7 7-7 7 7"/>',stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',tasks:'<path d="m3 6 2 2 3-4m-5 9 2 2 3-4m-5 9 2 2 3-4M11 6h10M11 13h10M11 20h10"/>',note:'<path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h5"/>',download:'<path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/>',upload:'<path d="M12 16V4m-5 5 5-5 5 5M4 17v4h16v-4"/>'};
 export const chatIcon=name=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${chatIcons[name]||chatIcons.new}</svg>`;
 const iconAction=(action,icon,label,extra='')=>`<button type="button" class="ki-icon-action" data-ki-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}>${chatIcon(icon)}</button>`;
-export function createKIView({onChange,onNote,getContext=()=>({workspace:{projects:[],notes:[],tasks:[]},updates:[]}),onSource=()=>{},onAction=()=>{throw new Error('Lokale Aktionen sind nicht verfügbar.');},onUndo=()=>{},onCalendarExport=()=>{},onCalendarOpen=()=>{},onPlatform,onBrowserRead,speechCaptureFactory}){
+export function createKIView({onChange,onNote,getContext=()=>({workspace:{projects:[],notes:[],tasks:[]},updates:[]}),onSource=()=>{},onAction=()=>{throw new Error('Lokale Aktionen sind nicht verfügbar.');},onUndo=()=>{},onCalendarExport=()=>{},onCalendarOpen=()=>{},onPlatform,onBrowserRead,onSpaces,speechCaptureFactory}){
   let selectedProvider='kiconnect';try{const saved=localStorage.getItem('context-ai-provider');if(Object.hasOwn(PROVIDERS,saved))selectedProvider=saved;}catch{}
   const state={provider:selectedProvider,models:[],model:'',messages:[],draft:'',busy:false,connecting:false,loading:false,loaded:false,error:'',storage:'',abort:null,enabled:{...DEFAULT_KNOWLEDGE},allowActions:false,calendarDirect:true,attachments:[],readingPhoto:false,browserEnabled:true,steps:[],scope:'',scopeSet:false,localPort:1234,menu:''};
   const updateView=onChange;
@@ -139,6 +139,11 @@ export function createKIView({onChange,onNote,getContext=()=>({workspace:{projec
         complete:(messages,signal)=>api('chat',{method:'POST',headers:{'Content-Type':'application/json','X-Context-Request':'ki-request'},signal,body:JSON.stringify({model:state.model,messages})}),
         pageContext:c.pageContext,
         getWorkspace:()=>getContext().workspace,getPlatformSources:()=>getContext().platformSources||[],
+        spaces:state.browserEnabled&&state.enabled.browser&&onSpaces?async(tool,args,signal)=>{
+          const value=await onSpaces(tool,args,signal);
+          if(tool==='read_spaces_result'&&state.enabled.platforms&&onBrowserRead)await onBrowserRead(value,{projectId:args.projectId,courseURL:value.courseURL,signal});
+          return value;
+        }:undefined,
         platform:state.browserEnabled&&state.enabled.platforms&&onPlatform?onPlatform:undefined,
         browser:state.browserEnabled&&agentBrowserAvailable()?async(tool,args,signal,scope)=>{
           const page=await requestAgentBrowser({command:['browser_start','browser_course'].includes(tool)?'start':tool==='browser_open'?'open':tool==='browser_click'?'click':tool==='browser_scroll'?'scroll':'read',...(tool==='browser_start'||tool==='browser_course'?{url:spaceBrowserURL(c.workspace.projects.find(p=>p.id===(tool==='browser_course'?args.projectId:c.projectId)))||'https://spaces.th-koeln.de/'}:args)},{signal});

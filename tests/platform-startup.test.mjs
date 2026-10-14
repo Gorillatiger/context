@@ -9,6 +9,8 @@ import vm from 'node:vm';
 import {createDesktopPlatform} from '../desktop/platform.mjs';
 import {createDocumentReader} from '../desktop/document-reader.mjs';
 import {createCourseFileFetch} from '../desktop/course-file-fetch.mjs';
+import {createDesktopSpacesSearch} from '../desktop/spaces-search.mjs';
+import {createSpacesSearchIPC} from '../desktop/spaces-search-ipc.mjs';
 import {providerPreferences,WEBSITE_PARTITION} from '../desktop/browser-session.mjs';
 import {HUB,hubURL,browserURL,requestURL,displayURL,frameBounds} from '../desktop/policy.mjs';
 import {platformCatalog} from '../dist/source-catalog.js';
@@ -18,16 +20,17 @@ import {cleanPlatformSources} from '../dist/source-store.js';
 // Exercise the actual top-level main module with synthetic Electron surfaces.
 // This deliberately does not load Electron, inspect the real app profile,
 // start a server, open UI or contact any provider.
-async function startup(){
-  const source=await readFile(new URL('../desktop/main.mjs',import.meta.url),'utf8'),events=[],channels=new Map(),windows=[],sessions=new Map(),calls={external:[],server:[],sessionKeeper:0};
+async function startup({providerFetch}={}){
+  const source=await readFile(new URL('../desktop/main.mjs',import.meta.url),'utf8'),events=[],channels=new Map(),windows=[],sessions=new Map(),calls={external:[],server:[],provider:[],nativeEvents:[],sessionKeeper:0};
   const app=new EventEmitter();Object.assign(app,{getPath:()=>'/synthetic/context-userdata',setName:()=>{},getVersion:()=> '0.17.0',whenReady:async()=>events.push('ready'),setActivationPolicy:()=>events.push('activation'),show:()=>events.push('app-show'),focus:()=>events.push('app-focus'),quit:()=>events.push('quit')});
-  class Contents extends EventEmitter{constructor(){super();this.mainFrame={url:HUB+'/#today'};this.url=HUB+'/#today';this.navigationHistory={canGoBack:()=>false,canGoForward:()=>false};}getURL(){return this.url;}isDestroyed(){return false;}setWindowOpenHandler(handler){this.popup=handler;}send(){}focus(){}close(){}async loadURL(url){this.url=url;this.mainFrame.url=url;events.push('window-load');}isLoading(){return false;}}
-  const sessionFactory=partition=>{if(sessions.has(partition))return sessions.get(partition);const value=new EventEmitter(),cookies=new EventEmitter();cookies.get=async()=>[];cookies.flushStore=async()=>{};Object.assign(value,{fetch:async()=>{throw new Error('No provider fetch at startup');},cookies,webRequest:{onBeforeRequest:handler=>value.requestGuard=handler},setPermissionRequestHandler:handler=>value.requestPermission=handler,setPermissionCheckHandler:handler=>value.checkPermission=handler,getUserAgent:()=> 'synthetic-chromium',setUserAgent:agent=>value.agent=agent,flushStorageData:()=>{}});sessions.set(partition,value);return value;};
+  class Contents extends EventEmitter{constructor(){super();this.mainFrame={url:HUB+'/#today'};this.url=HUB+'/#today';this.navigationHistory={canGoBack:()=>false,canGoForward:()=>false};}getURL(){return this.url;}isDestroyed(){return false;}setWindowOpenHandler(handler){this.popup=handler;}send(channel,payload){calls.nativeEvents.push({channel,payload});}focus(){}close(){}async loadURL(url){this.url=url;this.mainFrame.url=url;events.push('window-load');}isLoading(){return false;}}
+  const sessionFactory=partition=>{if(sessions.has(partition))return sessions.get(partition);const value=new EventEmitter(),cookies=new EventEmitter();cookies.get=async()=>[];cookies.flushStore=async()=>{};Object.assign(value,{fetch:async(url,options)=>{calls.provider.push({url,options,partition});if(providerFetch)return providerFetch(url,options);throw new Error('No provider fetch at startup');},cookies,webRequest:{onBeforeRequest:handler=>value.requestGuard=handler},setPermissionRequestHandler:handler=>value.requestPermission=handler,setPermissionCheckHandler:handler=>value.checkPermission=handler,getUserAgent:()=> 'synthetic-chromium',setUserAgent:agent=>value.agent=agent,flushStorageData:()=>{}});sessions.set(partition,value);return value;};
   class Window extends EventEmitter{constructor(options){super();assert.ok(events.includes('ready'));events.push('window-create');this.options=options;this.webContents=new Contents();this.webContents.session=sessionFactory('persist:context-workspace');this.contentView={addChildView(){},removeChildView(){}};windows.push(this);}getContentSize(){return [1440,940];}isDestroyed(){return false;}setBackgroundColor(){}show(){events.push('window-show');}focus(){events.push('window-focus');}loadURL(url){return this.webContents.loadURL(url);}}
   class View{constructor(options){this.options=options;this.webContents=new Contents();}setBackgroundColor(){}setVisible(){}setBounds(bounds){this.bounds=bounds;}}
   const nativeNango={initialize:async()=>{events.push('nango-init');},status:async service=>({service,integrationId:'',connectionId:'',revision:'0:0',connected:false,capabilities:{boardRead:true}}),proxy:async()=>{throw new Error('No provider requests in startup fixture');},handle:async()=>({configured:false}),dispose:async()=>{},localStatus:()=>({}),hasBinding:()=>false};
   const simple=()=>async()=>({}),speech=Object.assign(async()=>({}),{dispose(){},reset(){}}),theme={initialize:async()=>events.push('theme-init'),backgroundColor:()=> '#fff7f8',handle:async()=>({}),flush:async()=>{},dispose(){}};
   const dependencies={app,BrowserWindow:Window,WebContentsView:View,session:{fromPartition:sessionFactory},ipcMain:{handle:(channel,handler)=>{assert.ok(!channels.has(channel));channels.set(channel,handler);}},Menu:{buildFromTemplate:value=>value,setApplicationMenu(){events.push('menu');}},dialog:{showErrorBox:()=>{throw new Error('Unexpected startup dialog');},showMessageBoxSync:()=>0},shell:{openExternal:url=>calls.external.push(url)},safeStorage:{},nativeTheme:{},Notification:{isSupported:()=>false},fileURLToPath,path,createHash,HUB,browserURL,requestURL,hubURL,displayURL,frameBounds,safeSpacesURL:value=>value,readScript:()=>'',crawlerURL:value=>value,boardFinding:value=>value,createDesktopAI:simple,createDesktopCalendar:simple,createCalendarRouting:value=>value,createCalendarProviders:()=>({}),createDesktopNango:()=>nativeNango,createDesktopNangoMail:()=>Object.assign(simple(),{dispose(){}}),createDesktopOCR:simple,createDesktopSpeech:()=>speech,speechPermission:()=>false,WEBSITE_PARTITION,providerPreferences,allowProviderPopup:()=>false,createProviderSessionKeeper:()=>({status:()=>({mode:'encrypted'}),flush:async()=>{},start:async()=>{calls.sessionKeeper++;events.push('session-restore');}}),chromiumUserAgent:value=>value,createDesktopTheme:()=>theme,createDesktopChatFilter:()=>({initialize:async()=>events.push('chat-filter-init'),schedule(){},handle:async()=>({}),dispose:async()=>{}}),createInventoryBrowser:()=>({handle:async()=>({}),acceptsFrame:()=>false}),createDesktopDevDiary:()=>({handle:async()=>({}),dispose:async()=>{}}),createDiaryReminders:()=>Object.assign(simple(),{dispose:async()=>{}}),createDesktopPlatform,createDocumentReader,createCourseFileFetch,fetch:async url=>{calls.server.push(url);return {ok:true};}};
+  Object.assign(dependencies,{createDesktopSpacesSearch,createSpacesSearchIPC});
   dependencies.mainModuleURL=new URL('../desktop/main.mjs',import.meta.url).href;
   const names=Object.keys(dependencies),body=source.replace(/^import[^\n]+\n/gm,'').replaceAll('import.meta.url','mainModuleURL');
   const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
@@ -45,6 +48,35 @@ test('startup registers callable typed service and Miro IPC with the exact respo
 
 test('startup IPC refuses foreign webcontents or subframe callers before reaching provider bridges',async()=>{
   const f=await startup(),handle=f.channels.get('context:service');await assert.rejects(handle({...f.trustedEvent,sender:{}},{action:'registry',sources:[]}),/verweigert/);await assert.rejects(handle({...f.trustedEvent,senderFrame:{url:HUB}},{action:'registry',sources:[]}),/verweigert/);f.trustedEvent.senderFrame.url='https://evil.test/';await assert.rejects(handle(f.trustedEvent,{action:'registry',sources:[]}),/verweigert/);
+});
+
+test('the actual Spaces search IPC rejects websites, subframes and foreign origins before reaching the narrow provider service',async()=>{
+  const f=await startup(),handle=f.channels.get('context:spaces-search');assert.equal(typeof handle,'function');
+  const message={op:'search',requestId:randomUUID(),courseURL:'https://spaces.th-koeln.de/fixture-course/',projectId:'fixture',query:'prototype'};
+  await assert.rejects(handle({...f.trustedEvent,sender:{}},message),/verweigert/);
+  await assert.rejects(handle({...f.trustedEvent,senderFrame:{url:HUB+'/#today'}},message),/verweigert/);
+  const original=f.trustedEvent.senderFrame.url;f.trustedEvent.senderFrame.url='https://spaces.th-koeln.de/fixture-course/';
+  await assert.rejects(handle(f.trustedEvent,message),/verweigert/);f.trustedEvent.senderFrame.url=original;
+  assert.deepEqual(f.calls.provider,[]);
+  const forged=await handle(f.trustedEvent,{op:'read',requestId:randomUUID(),courseURL:message.courseURL,projectId:'fixture',id:'b:spaces-rest:'+'0'.repeat(64)});
+  assert.equal(forged.ok,false);assert.equal(forged.code,'NOT_OFFERED');assert.deepEqual(f.calls.provider,[]);
+  const invalid=await handle(f.trustedEvent,{...message,requestId:randomUUID(),method:'POST'});assert.equal(invalid.ok,false);assert.deepEqual(f.calls.provider,[]);
+  const unavailable=await handle(f.trustedEvent,message);assert.equal(unavailable.ok,false);assert.equal(unavailable.code,'NETWORK_ERROR');
+  assert.equal(f.calls.provider.length,1);const call=f.calls.provider[0];assert.equal(call.partition,WEBSITE_PARTITION);assert.equal(call.url,message.courseURL);
+  assert.equal(call.options.method,'GET');assert.equal(call.options.redirect,'manual');assert.equal(call.options.credentials,'include');assert.doesNotMatch(unavailable.error,/No provider fetch/);
+});
+
+test('the real startup cookie hook invalidates an unfinished Spaces search and emits no cookie data',async()=>{
+  let release;const waiting=new Promise(resolve=>{release=resolve;}),f=await startup({providerFetch:()=>waiting});
+  const pending=f.channels.get('context:spaces-search')(f.trustedEvent,{op:'search',requestId:randomUUID(),courseURL:'https://spaces.th-koeln.de/fixture-course/',projectId:'fixture',query:'prototype'});
+  for(let n=0;n<20&&!f.calls.provider.length;n++)await Promise.resolve();assert.equal(f.calls.provider.length,1);
+  const cookies=f.sessions.get(WEBSITE_PARTITION).cookies,signal=f.calls.provider[0].options.signal;
+  cookies.emit('changed',{}, {domain:'spaces.th-koeln.de',name:'analytics',httpOnly:false});assert.equal(signal.aborted,false);
+  cookies.emit('changed',{}, {domain:'.th-koeln.de',name:'wordpress_logged_in_fixture',httpOnly:true,value:'SYNTHETIC_COOKIE_NEVER_RENDER'});
+  assert.equal(signal.aborted,true);const result=await pending;assert.equal(result.ok,false);
+  release(new Response('Synthetic late page'));await Promise.resolve();assert.equal(f.calls.provider.length,1);
+  const notices=f.calls.nativeEvents.filter(value=>value.payload.type==='context-spaces-auth');assert.equal(notices.length,1);assert.deepEqual(notices[0].payload.detail,{});
+  assert.doesNotMatch(JSON.stringify(f.calls.nativeEvents),/SYNTHETIC_COOKIE_NEVER_RENDER|wordpress_logged_in_fixture/);
 });
 
 test('frontend catalog sources accepted for startup cannot poison native registry with unsupported Sciebo file redirect grants',async()=>{

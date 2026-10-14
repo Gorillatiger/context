@@ -7,6 +7,8 @@ import {safeSpacesURL} from '../dist/agent-browser.js';
 import {readScript,crawlerURL} from './reader.mjs';
 import {readerPlatformLinks} from './platform-link-policy.mjs';
 import {boardFinding} from '../dist/board-index.js';
+import {createDesktopSpacesSearch} from './spaces-search.mjs';
+import {createSpacesSearchIPC} from './spaces-search-ipc.mjs';
 import {createDesktopAI} from './ai.mjs';
 import {createDesktopCalendar} from './calendar.mjs';
 import {createCalendarRouting} from './calendar-routing.mjs';
@@ -26,7 +28,7 @@ import {createDesktopPlatform} from './platform.mjs';
 import {createDocumentReader} from './document-reader.mjs';
 import {createCourseFileFetch} from './course-file-fetch.mjs';
 const desktopAI=createDesktopAI();
-let desktopCalendar,desktopNango,desktopNangoMail,desktopPlatform;
+let desktopCalendar,desktopNango,desktopNangoMail,desktopPlatform,desktopSpacesSearch;
 const desktopOCR=createDesktopOCR();
 const desktopDocumentReader=createDocumentReader();
 app.setName('Context Browser');
@@ -140,6 +142,8 @@ desktopChatFilter=createDesktopChatFilter({directory:app.getPath('userData'),cry
 await desktopChatFilter.initialize();
 if(process.platform==='darwin')app.setActivationPolicy('regular');
 const providerSession=session.fromPartition(WEBSITE_PARTITION);
+desktopSpacesSearch=createSpacesSearchIPC(createDesktopSpacesSearch({providerSession}));
+providerSession.cookies.on('changed',(_event,cookie)=>{const domain=String(cookie.domain||'').replace(/^\./,'').toLowerCase();if(domain&&('spaces.th-koeln.de'===domain||'spaces.th-koeln.de'.endsWith('.'+domain))&&(cookie.httpOnly||/wordpress|session|auth/i.test(cookie.name||''))){desktopSpacesSearch.invalidate();emit('context-spaces-auth',{});}});
 const diaryDirectory=path.join(app.getPath('userData'),'dev-diaries');
 desktopDevDiary=createDesktopDevDiary({providerSession,directory:diaryDirectory});
 desktopDiaryReminders=createDiaryReminders({directory:diaryDirectory,crypto:safeStorage,notify:detail=>{
@@ -165,8 +169,8 @@ hubSession.setPermissionRequestHandler((wc,permission,callback,details)=>callbac
 hubSession.setPermissionCheckHandler((wc,permission,origin,details)=>speechPermission({webContents:wc,expected:win?.webContents,permission,origin,mediaTypes:[details.mediaType],mainFrame:details.isMainFrame!==false}));
 win.webContents.on('will-navigate',(e,url)=>{if(!hubURL(url))e.preventDefault();});win.webContents.on('will-redirect',(e,url)=>{if(!hubURL(url))e.preventDefault();});win.webContents.on('will-attach-webview',e=>e.preventDefault());
 win.webContents.setWindowOpenHandler(({url})=>{try{openInHub(url);}catch{}return {action:'deny'};});
-for(const [name,fn] of [['browser',browser],['space',space],['agent',agent],['ai',desktopAI],['calendar',desktopCalendar],['nango',desktopNango.handle],['nango-mail',desktopNangoMail],['service',desktopPlatform.service],['miro',desktopPlatform.miro],['ocr',desktopOCR],['speech',desktopSpeech],['chat-filter',desktopChatFilter.handle],['dev-diary',desktopDevDiary.handle],['diary-reminders',desktopDiaryReminders],['theme',desktopTheme.handle]])ipcMain.handle('context:'+name,async(e,message)=>{trusted(e);try{return {ok:true,value:await fn(message)};}catch(error){return {ok:false,error:error.message,code:error.code};}});
-win.on('resize',()=>{geometry=null;layout();emit('context-browser-layout',{});});win.webContents.on('did-start-navigation',(_e,_url,_inPlace,main)=>{if(main){cancelAgentRequests();desktopPlatform.cancel();void desktopSpeech({type:'cancel'});geometry=null;layout();}});
+for(const [name,fn] of [['spaces-search',desktopSpacesSearch.handle],['browser',browser],['space',space],['agent',agent],['ai',desktopAI],['calendar',desktopCalendar],['nango',desktopNango.handle],['nango-mail',desktopNangoMail],['service',desktopPlatform.service],['miro',desktopPlatform.miro],['ocr',desktopOCR],['speech',desktopSpeech],['chat-filter',desktopChatFilter.handle],['dev-diary',desktopDevDiary.handle],['diary-reminders',desktopDiaryReminders],['theme',desktopTheme.handle]])ipcMain.handle('context:'+name,async(e,message)=>{trusted(e);try{return {ok:true,value:await fn(message)};}catch(error){return {ok:false,error:error.message,code:error.code};}});
+win.on('resize',()=>{geometry=null;layout();emit('context-browser-layout',{});});win.webContents.on('did-start-navigation',(_e,_url,_inPlace,main)=>{if(main){cancelAgentRequests();desktopSpacesSearch.invalidate();desktopPlatform.cancel();void desktopSpeech({type:'cancel'});geometry=null;layout();}});
 win.webContents.on('render-process-gone',()=>desktopSpeech.reset());
 win.webContents.on('did-finish-load',state);
 win.on('closed',()=>{cancelAgentRequests();desktopPlatform.dispose();for(const t of tabs.values())t.view.webContents.close();boardScanTab?.view.webContents.close();boardScanTab=null;tabs.clear();win=null;app.quit();});
@@ -174,7 +178,7 @@ Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Context Browser',submenu
 app.on('second-instance',()=>{app.show();win?.show();win?.focus();});
 app.on('activate',()=>{app.show();win?.show();win?.focus();});
 sessionKeeper=createProviderSessionKeeper({cookies:providerSession.cookies,crypto:safeStorage,profile:app.getPath('userData'),onChange:()=>state()});
-app.on('before-quit',async event=>{if(quitReady)return;event.preventDefault();if(quitPending)return;quitPending=true;cancelAgentRequests();desktopPlatform.dispose();desktopDocumentReader.dispose();desktopSpeech.dispose();desktopNangoMail.dispose();await desktopNango.dispose();await desktopChatFilter.dispose();await desktopDevDiary.dispose();await desktopDiaryReminders.dispose();await desktopTheme.flush();desktopTheme.dispose();await sessionKeeper.flush();providerSession.flushStorageData();quitReady=true;app.quit();});
+app.on('before-quit',async event=>{if(quitReady)return;event.preventDefault();if(quitPending)return;quitPending=true;cancelAgentRequests();desktopSpacesSearch.dispose();desktopPlatform.dispose();desktopDocumentReader.dispose();desktopSpeech.dispose();desktopNangoMail.dispose();await desktopNango.dispose();await desktopChatFilter.dispose();await desktopDevDiary.dispose();await desktopDiaryReminders.dispose();await desktopTheme.flush();desktopTheme.dispose();await sessionKeeper.flush();providerSession.flushStorageData();quitReady=true;app.quit();});
 await ensureServer();
 await win.loadURL(HUB+'/#today').catch(()=>dialog.showErrorBox('Context-Server starten','Bitte zuerst start.command im context-hub-Ordner starten. Der lokale Server läuft auf Port 4318.'));
 

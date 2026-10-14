@@ -129,6 +129,6 @@ test('flag/send invalidation preserves useful headers and changes in other mail 
 test('persisted pagehide preserves search while a terminal pagehide disposes it',()=>{
   const app=source(),hook=app.split('\n').find(line=>line.includes("window.addEventListener('pagehide'")&&line.includes('searchView.dispose'));
   assert.ok(hook,'the fixture must exercise the actual search cleanup hook');
-  const window=events();let disposed=0,crawlDisposed=0,crawlPaused=0;const context={window,sourceHub:{dispose:()=>{}},searchView:{dispose:()=>disposed++},crawlerView:{dispose:()=>crawlDisposed++,pause:()=>crawlPaused++}};vm.createContext(context);vm.runInContext(hook,context);
-  window.emit('pagehide',{persisted:true});assert.equal(disposed,0);assert.equal(crawlDisposed,0);assert.equal(crawlPaused,1);window.emit('pagehide',{persisted:false});assert.equal(disposed,1);assert.equal(crawlDisposed,1);assert.equal(crawlPaused,1);
+  const window=events();let disposed=0,spacesDisposed=0,crawlDisposed=0,crawlPaused=0;const context={window,sourceHub:{dispose:()=>{}},spacesSearch:{dispose:()=>spacesDisposed++},searchView:{dispose:()=>disposed++},crawlerView:{dispose:()=>crawlDisposed++,pause:()=>crawlPaused++}};vm.createContext(context);vm.runInContext(hook,context);
+  window.emit('pagehide',{persisted:true});assert.equal(disposed,0);assert.equal(spacesDisposed,0);assert.equal(crawlDisposed,0);assert.equal(crawlPaused,1);window.emit('pagehide',{persisted:false});assert.equal(disposed,1);assert.equal(spacesDisposed,1);assert.equal(crawlDisposed,1);assert.equal(crawlPaused,1);
 });

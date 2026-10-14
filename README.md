@@ -2,7 +2,7 @@
 
 Ein lokaler Studien-Hub für Code & Context an der TH Köln. Kurse, Aufgaben, Notizen, Quellen, Mail und Kalender stehen in einer Oberfläche bereit. Ein KI-Begleiter kann freigegebene Quellen lesen und Antworten mit Quellenlinks liefern.
 
-**Stand: 0.17.4.** Entwicklungsprojekt, keine offizielle Anwendung der TH Köln. Integrationen benötigen eine eigene Anmeldung und gegebenenfalls eigene API-/OAuth-Konfiguration; ein Link allein ist noch kein verbundener Connector.
+**Stand: 0.18.0.** Entwicklungsprojekt, keine offizielle Anwendung der TH Köln. Integrationen benötigen eine eigene Anmeldung und gegebenenfalls eigene API-/OAuth-Konfiguration; ein Link allein ist noch kein verbundener Connector.
 
 ## Starten
 
@@ -30,7 +30,7 @@ Der interaktive Start mit optionalen Connector-Zugangsdaten erfolgt über `pytho
 | Bereich | Umsetzung |
 | --- | --- |
 | Kurse und Wissen | Aufgaben, Markdown-Notizen, Dev Diaries, lokale Suche und Quellen mit Original-Link |
-| Spaces | Lesender Kurs-Crawler mit Unterseiten, Fortsetzung und sichtbarer Abdeckung; die Suche bleibt auf zugängliche, freigegebene Kursquellen begrenzt |
+| Spaces | Direkte WordPress-Suche für Nutzer und Agent ohne Vorabindex, mit Trefferseiten und lesbarer Vorschau; veröffentlichte Beiträge/Seiten pro verknüpftem Kurs. Optionaler Crawler für Offline-Auszüge |
 | Miro | Board-Links mit Fundstellen und Kurszuordnung; Board-Texte benötigen die separat eingerichtete Miro/Nango-Verbindung |
 | GitLab und Sciebo | Angemeldete, freigegebene Dienstquellen sowie angebotene Kursdateien; keine vollständige automatische Kopie aller privaten Dateien |
 | Kommunikation | Nachrichtenübersicht, Kursfilter, TH-Mail über IMAP/SMTP, Outlook/Gmail über eine konfigurierte Nango-Verbindung |
@@ -78,7 +78,7 @@ Das prüft JavaScript-Syntax, Funktions- und Sicherheitsregressionen sowie die P
 
 ## Dokumentation
 
-- [Suche](SEARCH.md), [Spaces-Crawler](CRAWLER.md), [Dienstquellen](PLATFORM-SEARCH.md), [Miro](MIRO.md)
+- [WordPress-Direktsuche](WORDPRESS-SEARCH.md), [Suche](SEARCH.md), [Spaces-Crawler](CRAWLER.md), [Dienstquellen](PLATFORM-SEARCH.md), [Miro](MIRO.md)
 - [Mail](MAIL.md), [Empfängervorschläge](MAIL-CONTACTS.md), [Mitteilungen](NOTIFICATIONS.md)
 - [Kalenderabgleich](CALENDAR-SYNC.md), [Tagesansicht](CALENDAR-DAY.md), [Nango](NANGO.md)
 - [Dev Diaries](DEV-DIARY.md), [KI-Nutzungslimits](AI-USAGE.md), [lokale Sprache](LOCAL-SPEECH.md)

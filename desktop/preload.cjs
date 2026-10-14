@@ -1,6 +1,7 @@
 const {contextBridge,ipcRenderer}=require('electron');
 // No raw IPC/event object is exposed, and remote pages never receive this preload.
 contextBridge.exposeInMainWorld('contextDesktop',Object.freeze({
+  spacesSearch:message=>ipcRenderer.invoke('context:spaces-search',message),
   boardScan:true,
   boardScanVersion:2,
   inventoryBrowser:true,

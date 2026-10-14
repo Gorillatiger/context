@@ -1,4 +1,6 @@
-# Lokale Suche · 0.16.7
+# Suche · 0.18.0
+
+Die globale Suche startet jetzt mit „Direkt in Spaces“: aktuelle veröffentlichte Kursbeiträge und Seiten ohne Vorabindex. „Lokal“ schaltet zur folgenden Offline-/Workspace-Suche um und lädt ihren Index erst bei Bedarf. Details und Grenzen: [WordPress-Direktsuche](WORDPRESS-SEARCH.md).
 
 Die Lupe oder ⌘K / Strg+K öffnet einen gemeinsamen Textindex. Kurs, Inhaltsart und Dienst lassen sich kombinieren. Pfeiltasten wählen einen Treffer; Enter öffnet den konkreten Eintrag. Der separate Link öffnet die Originalquelle. Hervorgehobene Auszüge können auch aus dem Ende einer langen Quelle stammen. Umlaute, ß, Präfixe und begrenzte Tippfehlerkorrektur werden berücksichtigt. Falls nicht alle Suchwörter gefunden werden, sind Ergebnisse als ähnliche Treffer gekennzeichnet.
 

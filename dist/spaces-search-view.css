@@ -1,0 +1,11 @@
+.context-search-modes{padding-top:12px;margin:0;gap:6px}
+.context-search-modes button{min-height:36px;padding:6px 11px;background:transparent;color:var(--muted);border-color:var(--line);font-size:12px}
+.context-search-modes button[aria-pressed="true"]{background:var(--coco-rose);color:var(--accent);border-color:var(--accent);font-weight:600}
+.context-search-modes button .tool-icon{width:20px;height:20px;flex:0 0 20px}
+.context-search-modes button>svg{width:16px;height:16px;flex:0 0 16px}
+.context-search-live-coverage{padding:0 20px 10px;max-height:20dvh;overflow:auto;flex-shrink:0;font-size:11px;line-height:1.6;color:var(--muted)}
+.context-search-live-coverage p{margin:0 0 5px;color:var(--theme-warning,var(--accent));overflow-wrap:anywhere}
+.context-search-live-coverage summary{cursor:pointer;min-height:28px;padding-block:4px}
+.context-search-live-coverage ul{margin:4px 0;padding-left:18px}
+.context-search-live-coverage li{overflow-wrap:anywhere}
+@media(max-width:600px){.context-search-modes{padding-inline:12px;padding-top:8px}.context-search-modes button{min-height:44px}.context-search-live-coverage{padding-inline:12px}}
