@@ -107,11 +107,12 @@ function legacyDocumentRead(start,validateURL,normalizePlatform,collectPlatforms
     if(linkRows.has(destination))continue;linkRows.add(destination);if(links.length===45){linksTruncated=true;continue;}
     const title=(label(anchor)||anchor.getAttribute('aria-label')||'Link').trim().slice(0,160);if(title)links.push({title,url:destination});
   }
-  const sidebar=document.querySelector('#defaultspace-sticky-sidebar'),boardLinks=[],boardSeen=new Set();let boardInspected=0,boardLinksMore=false;
+  const sidebar=document.querySelector('#defaultspace-sticky-sidebar'),boardLinks=[],boardInvites=[],boardSeen=new Set();let boardInspected=0,boardLinksMore=false;
   boards:for(const list of [root.querySelectorAll('a[href]'),sidebar?.querySelectorAll('a[href]')||[]])for(const anchor of list){
     if(++boardInspected>5000){boardLinksMore=true;break boards;}if(boardSeen.has(anchor))continue;boardSeen.add(anchor);
     if(!visible(anchor)||anchor.closest('form,[contenteditable=true],nav,header,footer'))continue;
     let target;try{target=normalizePlatform(anchor.href);if(target.service!=='miro')continue;}catch{continue;}
+    const share=(()=>{try{return new URL(anchor.href.replace(/&amp;/g,'&')).searchParams.get('share_link_id')||'';}catch{return '';}})();if(/^[A-Za-z0-9_-]{4,80}$/.test(share)&&boardInvites.length<100&&!boardInvites.some(row=>row.url===target.url))boardInvites.push({url:target.url,share});
     if(boardLinks.length===100){boardLinksMore=true;continue;}
     const post=anchor.closest('.comment,.comment-body,[id^=comment-],#defaultspace-sticky-sidebar')?null:anchor.closest('article,.post'),data=post&&(!post.getClientRects||visible(post))?postData(post):null;
     boardLinks.push({url:target.url,title:(label(anchor)||anchor.getAttribute('aria-label')||'').trim().slice(0,200),postedBy:data?.sourceURL?data.postedBy:'',postedAt:data?.sourceURL?data.legacyPostedAt:'',sourceTitle:data?.title||document.title.slice(0,200),sourceURL:data?.sourceURL||url});
@@ -122,7 +123,7 @@ function legacyDocumentRead(start,validateURL,normalizePlatform,collectPlatforms
   }
   const title=document.title.slice(0,200),{platformLinks,platformLinksMore,revisionLinks}=collectPlatforms(root,{pageURL:url,pageTitle:title,readLabel:label,readPost:postData,readVisible:visible},normalizePlatform);
   const contentRevision=digest(JSON.stringify([url,title,text,textTruncated,links,linksTruncated,controls,boardLinks,boardLinksMore,platformLinks,platformLinksMore,revisionLinks]));
-  return {boardLinks,boardLinksMore,platformLinks,platformLinksMore,contentRevision,controls,url,title,text:text.slice(start,start+5000),offset:start,hasMore:text.length>start+5000,textTruncated,links,linksTruncated,loginRequired:false};
+  return {boardLinks,boardInvites,boardLinksMore,platformLinks,platformLinksMore,contentRevision,controls,url,title,text:text.slice(start,start+5000),offset:start,hasMore:text.length>start+5000,textTruncated,links,linksTruncated,loginRequired:false};
 }
 
 export function readScript(offset=0,options={}){
@@ -233,11 +234,12 @@ function crawlerDocumentRead(options,validateURL,normalizePlatform,collectPlatfo
     };
     const posts=[];let postsInspected=0;for(const post of root.querySelectorAll('article,.post')){if(++postsInspected>5000||posts.length===50)break;if(visible(post)&&!post.closest('form,[contenteditable=true],[hidden],[aria-hidden=true]'))posts.push(postData(post));}
     const sidebar=document.querySelector('#defaultspace-sticky-sidebar'),boardCandidates=[root.querySelectorAll('a[href]'),sidebar?.querySelectorAll('a[href]')||[]];
-    const boardLinks=[],seenBoards=new Set();let boardLinksMore=false,boardInspected=0;
+    const boardLinks=[],boardInvites=[],seenBoards=new Set();let boardLinksMore=false,boardInspected=0;
     boards:for(const list of boardCandidates)for(const anchor of list){
       if(++boardInspected>5000){boardLinksMore=true;break boards;}if(seenBoards.has(anchor))continue;seenBoards.add(anchor);
       if(!visible(anchor)||anchor.closest('form,[contenteditable=true],nav,header,footer'))continue;
       let boardURL;try{const parsed=normalizePlatform(anchor.href);if(parsed.service!=='miro')continue;boardURL=parsed.url;}catch{continue;}
+      const share=(()=>{try{return new URL(anchor.href.replace(/&amp;/g,'&')).searchParams.get('share_link_id')||'';}catch{return '';}})();if(/^[A-Za-z0-9_-]{4,80}$/.test(share)&&boardInvites.length<100&&!boardInvites.some(row=>row.url===boardURL))boardInvites.push({url:boardURL,share});
       if(boardLinks.length===100){boardLinksMore=true;continue;}
       const post=anchor.closest('.comment,.comment-body,[id^=comment-],#defaultspace-sticky-sidebar')?null:anchor.closest('article,.post');
       const data=post&&visible(post)?postData(post):null;
@@ -248,7 +250,7 @@ function crawlerDocumentRead(options,validateURL,normalizePlatform,collectPlatfo
     const {platformLinks,platformLinksMore,revisionLinks}=collectPlatforms(root,{pageURL:url,pageTitle:title,readLabel:labelText,readPost:postData,readVisible:visible},normalizePlatform);
     const data=new TextEncoder().encode(JSON.stringify([url,title,fullText,overflow,discovered,linksTruncated,controls,controlsTruncated,metadata,boardLinks,boardLinksMore,platformLinks,platformLinksMore,revisionLinks]));
     const hash=await crypto.subtle.digest('SHA-256',data),contentRevision=[...new Uint8Array(hash)].map(value=>value.toString(16).padStart(2,'0')).join('');
-    return {url,title,text:fullText.slice(start,end),offset:start,nextOffset:end,hasMore:end<limit,totalLength:limit,originalObservedLength:totalLength,totalLengthKnown:!overflow,textTruncated:overflow||totalLength>limit,contentRevision,links:allLinks.slice(options.linkOffset,options.linkOffset+45),linkOffset:options.linkOffset,totalLinks:allLinks.length,linksHasMore:options.linkOffset+45<allLinks.length,linksTruncated,controls:controls.slice(options.controlOffset,options.controlOffset+30),controlOffset:options.controlOffset,totalControls:controls.length,controlsMore:options.controlOffset+30<controls.length,controlsTruncated,metadata,boardLinks,boardLinksMore,platformLinks,platformLinksMore,loginRequired:false};
+    return {boardInvites,url,title,text:fullText.slice(start,end),offset:start,nextOffset:end,hasMore:end<limit,totalLength:limit,originalObservedLength:totalLength,totalLengthKnown:!overflow,textTruncated:overflow||totalLength>limit,contentRevision,links:allLinks.slice(options.linkOffset,options.linkOffset+45),linkOffset:options.linkOffset,totalLinks:allLinks.length,linksHasMore:options.linkOffset+45<allLinks.length,linksTruncated,controls:controls.slice(options.controlOffset,options.controlOffset+30),controlOffset:options.controlOffset,totalControls:controls.length,controlsMore:options.controlOffset+30<controls.length,controlsTruncated,metadata,boardLinks,boardLinksMore,platformLinks,platformLinksMore,loginRequired:false};
   })();
 }
 

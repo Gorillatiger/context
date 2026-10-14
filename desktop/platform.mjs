@@ -4,12 +4,12 @@ import {createDesktopMiro} from './miro.mjs';
 import {safeMiroBoard} from '../connectors/miro.mjs';
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fail=(message,code='INVALID_REQUEST')=>{throw Object.assign(new Error(message),{code});};
-export function createDesktopPlatform({nango,createView,destroyView,openVisible,fetchText,readDocument,getAccountFingerprint=async()=>hash('session'),emit=()=>{}}){
+export function createDesktopPlatform({nango,createView,destroyView,openVisible,fetchText,readDocument,miroVisitor,miroLinks,getAccountFingerprint=async()=>hash('session'),emit=()=>{}}){
   let sources=[],boards=[],scopeHash=hash([]),scopeEpoch=0,generation=hash([scopeHash,scopeEpoch]),disposed=false;
   const accounts={gitlab:'',sciebo:'',mattermost:''},accountEpochs={gitlab:0,sciebo:0,mattermost:0};
   async function account(service){const token=accountEpochs[service],value=await getAccountFingerprint(service);if(disposed||token!==accountEpochs[service])fail('Die Anmeldung wurde geändert.','ACCOUNT_CHANGED');if(typeof value!=='string'||!/^[a-f0-9]{64}$/.test(value))fail('Ungültige Sitzung.');if(accounts[service]&&accounts[service]!==value){reader.invalidate();accountEpochs[service]++;emit({service});}accounts[service]=value;return value;}
-  const reader=createServiceReader({createView,destroyView,openVisible,fetchText,readDocument,getSources:()=>sources,getAuthRevision:service=>(accounts[service]||'')+':'+accountEpochs[service]});
-  const miro=createDesktopMiro({nango,getAllowedBoards:()=>boards,getGeneration:()=>generation});
+  const reader=createServiceReader({createView,destroyView,openVisible,fetchText,readDocument,rememberInvites:invites=>miroLinks?.remember(invites),getSources:()=>sources,getAuthRevision:service=>(accounts[service]||'')+':'+accountEpochs[service]});
+  const miro=createDesktopMiro({nango,visitor:miroVisitor,shareLinks:miroLinks,getAllowedBoards:()=>boards,getGeneration:()=>generation});
   function registry(values){
     if(!Array.isArray(values)||values.length>100)fail('Zu viele Plattformquellen.');
     const all=values.map(row=>{
