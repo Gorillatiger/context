@@ -52,6 +52,10 @@ Bevor eine große Aufgabe an KI:connect NRW geht, schätzt Context den Aufwand l
 
 Fragen zur offenen Seite („dieses Board“, „hier“) und kleine Fragen werden nie unterbrochen, OpenRouter und lokale Modelle auch nicht. Während der Arbeit weiß das Modell, dass es auf Hochschul-KI knapp ist: Wird die Aufgabe größer als gedacht, fragt es mit Auswahl nach (z. B. „Auf Kurs X eingrenzen“, „Zu OpenRouter wechseln“). Wählst du „Zu OpenRouter wechseln“, wechselt Context tatsächlich und stellt die ursprüngliche Frage dort. Erreicht ein Lauf die Schrittgrenze oder das Kontextbudget, erscheint der Wechsel-Kasten. Geprüft mit `npm run test:ki:effort` (echte Oberfläche, Modelle gescriptet).
 
+## Anmeldung für Kursquellen (GitLab, Sciebo, Mattermost)
+
+Braucht eine Kursquelle deine Anmeldung, schreibt der Assistent keine Anleitung. Unter der Antwort erscheint stattdessen eine Karte mit **Anmelden ↗** (öffnet die Quelle im Context-Browser) und **Angemeldet – Frage erneut stellen** (stellt dieselbe Frage noch einmal). Die übrigen Quellen liest er in derselben Antwort weiter.
+
 ## Rückfragen und Aktualität (Assistent)
 
 - **Rückfragen:** Das Werkzeug `ask_user` zeigt 2 bis 6 Auswahlfelder (Checkboxen bei Mehrfachauswahl, sonst Auswahlknöpfe) plus ein Feld „Anderes“; die erste Option ist die Empfehlung des Assistenten. Gefragt wird nur, wenn die Antwort das Ergebnis wesentlich ändert und sich nicht durch Lesen klären lässt, höchstens einmal je Auftrag und nie direkt nach einer Antwort (`allowAsk`). Die Auswahl geht als normale Nachricht „Meine Auswahl zu deiner Rückfrage: …“ weiter; der Entwurf im Eingabefeld bleibt erhalten. Beantwortete und unbeantwortete Rückfragen bleiben im Chatarchiv.

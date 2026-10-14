@@ -111,3 +111,15 @@ test('the encrypted chat archive keeps pictures and notes and drops damaged ones
   const encrypted=await encryptChat(chat,key);assert.doesNotMatch(Buffer.from(encrypted.cipher).toString('latin1'),/\/9j\/AAAA/,'pictures are encrypted at rest');
   assert.equal((await decryptChat(encrypted,key)).messages[1].shots[0].data,JPEG);
 });
+
+test('a source that needs a login is reported to the person as a sign-in card payload, not only in prose',async()=>{
+  const {runProjectAgent}=await import('../dist/knowledge.js');
+  const GITLAB='https://git.coco.study/students/ws2627/kurs/repo/',ws={projects:[{id:'courseA',name:'Kurs A',links:[{id:'g',tool:'gitlab',url:GITLAB,title:'Kurs-Repository'}]}],notes:[],tasks:[],calendarEvents:[],boardFindings:[],bookmarks:[],tools:[],activeCourse:'courseA'};
+  const source=platformCatalog(ws).find(row=>row.service==='gitlab');assert.ok(source,'gitlab source in the catalog');
+  const platform=async()=>({documents:[],result:{sourceId:source.id,service:'gitlab',loginRequired:true,results:[]}});
+  const replies=[tool('read_platform',{sourceId:source.id}),answer('GitLab braucht deine Anmeldung.')];
+  const result=await runProjectAgent({prompt:'Prüfe meine GitLab-Abgabe',workspace:ws,getWorkspace:()=>ws,documents:[],projectId:'courseA',platform,complete:async()=>replies.shift()});
+  assert.deepEqual(result.loginNeeded,[{sourceId:source.id,service:'gitlab',title:source.title,url:source.url}]);
+  const clean=cleanChat({version:1,id:'c1',title:'t',scope:'courseA',projectName:'',createdAt:'',updatedAt:'',draft:'',model:'',provider:'kiconnect',steps:[],interrupted:false,messages:[{id:'m',role:'assistant',content:'x',loginNeeded:[...result.loginNeeded,{sourceId:'x',service:'gitlab',title:'t',url:'http://evil.test/'},{sourceId:'../x',service:'g',title:'t',url:'https://git.coco.study/'}]}]});
+  assert.equal(clean.messages[0].loginNeeded.length,1);
+});

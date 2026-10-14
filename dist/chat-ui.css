@@ -191,3 +191,8 @@ body.ai-active .context-agent-launcher { display: none; }
 .ki-chat .ki-effort input[type=radio] { width: auto; height: auto; min-height: 0; flex: none; margin: 3px 0 0; padding: 0; }
 .ki-chat .ki-effort-actions { display: flex; align-items: center; gap: 14px; }
 @media (max-width: 600px) { .ki-chat .ki-effort { margin: 0 12px 8px; } }
+
+/* Login prompt under an answer when a course source needs the person's sign-in */
+.ki-chat .ki-login { display: grid; gap: 8px; margin: 10px 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--coco-paper); }
+.ki-chat .ki-login-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; font-size: 13px; line-height: 1.4; }
+.ki-chat .ki-login .button.primary { justify-self: start; }
