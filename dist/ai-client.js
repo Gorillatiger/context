@@ -6,7 +6,7 @@ export async function aiRequest(provider,action,{body,signal,onWait}={}){
   return action==='chat'?campusGate.run(provider,()=>request(provider,action,{body,signal}),{signal,onWait}):request(provider,action,{body,signal});
 }
 async function request(provider,action,{body,signal}={}){
-  if(!Object.hasOwn(PROVIDERS,provider)||!['models','status','chat','connection','usage'].includes(action)||action==='usage'&&body!==undefined)throw new Error('Ungültige KI-Verbindung.');
+  if(!Object.hasOwn(PROVIDERS,provider)||!['models','status','chat','connection','usage','forget'].includes(action)||action==='usage'&&body!==undefined||action==='forget'&&(provider==='local'||!body||Object.keys(body).length))throw new Error('Ungültige KI-Verbindung.');
   if(signal?.aborted)throw new DOMException('Abgebrochen','AbortError');
   if(['openrouter','local'].includes(provider)&&typeof window.contextDesktop?.ai==='function'){
     const id=crypto.randomUUID(),cancel=()=>{try{void Promise.resolve(window.contextDesktop.ai({action:'cancel',id,provider})).catch(()=>{});}catch{}};

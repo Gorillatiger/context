@@ -10,6 +10,7 @@ export function createDesktopAI(client=createKIClient({provider:'openrouter'}),l
     if(message.action==='status'&&!message.body)return target.status();
     if(message.action==='models'&&!message.body)return target.models();
     if(message.action==='connection')return target.configure(message.body);
+    if(message.action==='forget'&&message.body&&typeof message.body==='object'&&!Array.isArray(message.body)&&!Object.keys(message.body).length&&typeof target.forget==='function')return target.forget();
     if(!/^[a-f0-9-]{36}$/i.test(message.id||''))throw new KIError(400,'invalid_request','Ungültige Anfragekennung.');
     if(message.action==='cancel'){requests.get(requestId)?.abort();return;}
     if(!['chat','usage'].includes(message.action)||message.action==='usage'&&message.body!==undefined||requests.has(requestId))throw new KIError(400,'invalid_request','Ungültige KI-Aktion.');

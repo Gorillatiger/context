@@ -10,6 +10,8 @@ import {boardFinding} from '../dist/board-index.js';
 import {createDesktopSpacesSearch} from './spaces-search.mjs';
 import {createSpacesSearchIPC} from './spaces-search-ipc.mjs';
 import {createDesktopAI} from './ai.mjs';
+import {createDesktopKeyStore} from './key-store.mjs';
+import {createKIClient} from '../connectors/ki.mjs';
 import {createDesktopCalendar} from './calendar.mjs';
 import {createCalendarRouting} from './calendar-routing.mjs';
 import {createCalendarProviders} from '../connectors/calendar.mjs';
@@ -30,7 +32,9 @@ import {createCourseFileFetch} from './course-file-fetch.mjs';
 import {createMiroShareLinks} from './miro-links.mjs';
 import {createMiroVisitorReader,miroOffscreenViews} from './miro-visitor.mjs';
 import {safeMiroBoard} from '../connectors/miro.mjs';
-const desktopAI=createDesktopAI();
+// Cloud AI keys are kept encrypted by the OS (safeStorage) and restored on start; see desktop/key-store.mjs.
+const desktopKeys=createDesktopKeyStore({directory:path.join(app.getPath('userData'),'ai'),crypto:safeStorage});
+const desktopAI=createDesktopAI(createKIClient({provider:'openrouter',credentialStore:desktopKeys.forProvider('openrouter')}));
 let desktopCalendar,desktopNango,desktopNangoMail,desktopPlatform,desktopSpacesSearch,desktopMiroLinks;
 const desktopOCR=createDesktopOCR();
 const desktopDocumentReader=createDocumentReader();
@@ -191,7 +195,7 @@ await ensureServer();
 await win.loadURL(HUB+'/#today').catch(()=>dialog.showErrorBox('Context-Server starten','Bitte zuerst start.command im context-hub-Ordner starten. Der lokale Server läuft auf Port 4318.'));
 
 async function ensureServer(){try{const response=await fetch(HUB+'/',{signal:AbortSignal.timeout(2000)});if(response.ok)return;}catch{}
- const {createServer}=await import('node:http');const {createRequestHandler}=await import('../server.mjs');const owned=createServer(createRequestHandler(()=>4318));await new Promise((resolve,reject)=>{owned.once('error',error=>error.code==='EADDRINUSE'?resolve():reject(error));owned.listen(4318,'127.0.0.1',resolve);});app.on('before-quit',()=>owned.close());}
+ const {createServer}=await import('node:http');const {createRequestHandler}=await import('../server.mjs');const owned=createServer(createRequestHandler(()=>4318,undefined,createKIClient({provider:'kiconnect',credentialStore:desktopKeys.forProvider('kiconnect')})));await new Promise((resolve,reject)=>{owned.once('error',error=>error.code==='EADDRINUSE'?resolve():reject(error));owned.listen(4318,'127.0.0.1',resolve);});app.on('before-quit',()=>owned.close());}
 
 app.show();win.show();win.focus();app.focus({steal:true});
 void sessionKeeper.start();

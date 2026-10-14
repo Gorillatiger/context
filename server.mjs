@@ -59,7 +59,7 @@ return async (req, res) => {
     if(!validHost(req.headers.host,port)){res.writeHead(403);return res.end('Host rejected');}
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     const mailActions=['connection','folders','list','message','attachment','attachment-link','flag','send'];
-    if(!['GET','HEAD'].includes(req.method)&&!(req.method==='POST'&&(['/api/ai/chat','/api/ai/connection','/api/spaces/search','/api/spaces/read'].includes(pathname)||mailActions.some(action=>pathname==='/api/mail/'+action)))){res.writeHead(405,{Allow:'GET, HEAD'});return res.end();}
+    if(!['GET','HEAD'].includes(req.method)&&!(req.method==='POST'&&(['/api/ai/chat','/api/ai/connection','/api/ai/forget','/api/spaces/search','/api/spaces/read'].includes(pathname)||mailActions.some(action=>pathname==='/api/mail/'+action)))){res.writeHead(405,{Allow:'GET, HEAD'});return res.end();}
     if(pathname.startsWith('/api/')){
       if(!cookieValid(req.headers.cookie,cookieName,sessionToken)||req.headers['sec-fetch-site']==='cross-site'||req.headers.origin&&!['http://127.0.0.1:'+port,'http://localhost:'+port].includes(req.headers.origin))return json(res,403,{error:'session_expired',message:'Die lokale Sitzung ist nicht mehr gültig. Sichere offene Entwürfe und lade den Arbeitsbereich neu.'});
       if(pathname.startsWith('/api/spaces/')){
@@ -122,13 +122,14 @@ return async (req, res) => {
             finally{res.off?.('close',closed);}
             return;
           }
-          if(['/api/ai/chat','/api/ai/connection'].includes(pathname)){
+          if(['/api/ai/chat','/api/ai/connection','/api/ai/forget'].includes(pathname)){
             if(req.method!=='POST'){res.writeHead(405,{Allow:'POST'});return res.end();}
             if(req.headers.origin!=='http://'+req.headers.host||req.headers['x-context-request']!=='ki-request'){res.writeHead(403);return res.end('Unauthorized');}
             if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')return json(res,415,{error:'invalid_content_type',message:'Die KI-Anfrage benötigt application/json.'});
             const body=await chatBody(req);
             const client=selectProvider(body?.provider),input=body&&typeof body==='object'&&!Array.isArray(body)?Object.fromEntries(Object.entries(body).filter(([key])=>key!=='provider')):body;
             if(pathname==='/api/ai/connection')return json(res,200,await client.configure(input));
+            if(pathname==='/api/ai/forget'){if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length)throw new KIError(400,'invalid_request','Ungültige KI-Anfrage.');return json(res,200,await client.forget());}
             const controller=new AbortController();
             const closed=()=>{if(!res.writableEnded)controller.abort();};
             res.once?.('close',closed);

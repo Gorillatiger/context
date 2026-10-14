@@ -48,11 +48,13 @@ async function limitedJSON(response,limit=1000000){
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   }catch(error){await reader.cancel().catch(()=>{});throw error;}
 }
-export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Date.now}={}){
+// credentialStore (optional): {load()→key|'', save(key)→boolean, clear()} persists the key encrypted;
+// without it, or when saving fails, the key lives in memory only (storage 'session').
+export function createKIClient({provider='kiconnect',getKey,credentialStore,fetcher=fetch,now=Date.now}={}){
   if(!Object.hasOwn(AI_PROVIDERS,provider))throw new KIError(400,'invalid_provider','Unbekannter KI-Anbieter.');
   const config=AI_PROVIDERS[provider],name=config.name;
   getKey||=provider==='kiconnect'?readKIKey:()=>readKIKey({KICONNECT_API_KEY:process.env.OPENROUTER_API_KEY});
-  let cachedModels=null,cachedKey='',cachedAt=0,active=false,sessionCredential=null;
+  let cachedModels=null,cachedKey='',cachedAt=0,active=false,sessionCredential=null,storedCredential,storedLoading;
   let usageCache=null,usagePending=null,usageRevision=0;
   let requests=[];
   function localRateLimit(){
@@ -65,7 +67,15 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
   function requireRateCapacity(){const rate=localRateLimit();if(!rate.remaining)throw limitError('local_limit','Bitte kurz warten. Höchstens zehn KI-Anfragen pro Minute.',rate.retryAfterMs);}
   const fingerprint=key=>createHash('sha256').update(key).digest('hex');
   const invalidateUsage=()=>{usageRevision++;usageCache=null;usagePending?.controller.abort();usagePending=null;};
-  const currentCredential=async()=>sessionCredential||await getKey();
+  async function stored(){
+    if(!credentialStore)return null;
+    if(storedCredential!==undefined)return storedCredential;
+    storedLoading||=(async()=>{let key='';try{key=await credentialStore.load();}catch{}
+      const result=typeof key==='string'&&key&&key.length<=4096&&!/[\r\n]/.test(key)?{key,storage:'encrypted'}:null;
+      if(storedCredential===undefined)storedCredential=result;return storedCredential;})();
+    return storedLoading;
+  }
+  const currentCredential=async()=>sessionCredential||await stored()||await getKey();
   async function credential(){const result=await currentCredential();if(!result?.key)throw new KIError(503,'not_configured',name+' ist noch nicht eingerichtet. Verbinde deinen API-Schlüssel in dieser Ansicht.');return result;}
   async function request(path,key,body,signal){
     try{
@@ -109,6 +119,18 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
     });
   }
   return {
+    /** Removes the saved and the in-memory key. A key from the environment (start-local) stays. */
+    async forget(){
+      if(active)throw new KIError(429,'busy','Eine KI-Anfrage läuft bereits. Bitte kurz warten.');
+      active=true;
+      try{
+        sessionCredential=null;storedCredential=null;storedLoading=undefined;cachedModels=null;cachedKey='';
+        try{await credentialStore?.clear();}catch{throw new KIError(500,'forget_failed','Der gespeicherte Schlüssel konnte nicht entfernt werden. Bitte erneut versuchen.');}
+        invalidateUsage();
+        const auth=await getKey();
+        return {configured:!!auth?.key,storage:auth?.storage||null,provider:name};
+      }finally{active=false;}
+    },
     async status(){const auth=await currentCredential();return {configured:!!auth?.key,storage:auth?.storage||null,provider:name};},
     async models(){const auth=await credential();return {models:await modelsWithKey(auth),storage:auth.storage,provider:name};},
     async usage(signal){
@@ -151,7 +173,9 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
           if(checked.data.is_management_key===true)throw new KIError(400,'management_key','Bitte einen Modell-API-Schlüssel verwenden, keinen Management-Schlüssel.');
         }
         const models=await modelsWithKey(auth);
-        sessionCredential=auth;
+        // Persist only a key the provider just accepted.
+        if(credentialStore){let saved=false;try{saved=await credentialStore.save(auth.key)===true;}catch{}auth.storage=saved?'encrypted':'session';}
+        sessionCredential=auth;storedCredential=auth.storage==='encrypted'?auth:null;storedLoading=undefined;
         invalidateUsage();
         return {models,storage:auth.storage,provider:name};
       }finally{active=false;}
