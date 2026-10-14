@@ -235,7 +235,7 @@ function fakeView({states,status=200,redirect,onLoad}={}){
   const wc={
     on:(event,listener)=>{listeners.set(event,[...(listeners.get(event)||[]),listener]);},
     emit:(event,...args)=>{for(const listener of listeners.get(event)||[])listener(...args);},
-    loadURL:async next=>{loads.push(next);await onLoad?.();if(redirect){const event={defaultPrevented:false,preventDefault(){this.defaultPrevented=true;}};wc.emit('will-redirect',event,redirect);if(event.defaultPrevented)throw new Error('ERR_ABORTED');}url=next;wc.emit('did-navigate',{},next,status);},
+    loadURL:async next=>{loads.push(next);await onLoad?.();if(redirect){const event={defaultPrevented:false,preventDefault(){this.defaultPrevented=true;}};wc.emit('will-redirect',event,redirect);if(event.defaultPrevented)throw new Error('ERR_ABORTED');}url=redirect||next;wc.emit('did-navigate',{},url,status);},
     getURL:()=>url,executeJavaScriptInIsolatedWorld:async(world,[{code}])=>{assert.equal(world,1003);assert.equal(code,miroOverviewScript());return sequence.length>1?sequence.shift():sequence[0];},
     setBackgroundThrottling:()=>{},setAudioMuted:()=>{},setWindowOpenHandler:handler=>{assert.deepEqual(handler(),{action:'deny'});},stop:()=>{},close:()=>{closed++;destroyed=true;},isDestroyed:()=>destroyed,
   };
@@ -270,6 +270,37 @@ test('visitor reader reports login, missing access, unavailable overviews and ca
   const live=new AbortController(),fake=fakeView({states:[{state:'loading'}]}),reader=createMiroVisitorReader({pollMs:5,createView:()=>fake.view}),pending=reader({url:BOARD},live.signal);
   setTimeout(()=>live.abort(),15);await assert.rejects(pending,{code:'cancelled'});assert.equal(fake.closed(),1);
   reader.dispose();await assert.rejects(reader({url:BOARD}),{code:'closed'});
+});
+
+test('visitor reader rejects a ready snapshot redirected to another board without caching it as the requested board',async()=>{
+  const views=[];let redirected=true;
+  const reader=createMiroVisitorReader({pollMs:1,now:()=>NOW,createView:()=>{
+    const fake=fakeView({states:[ready],...(redirected?{redirect:'https://miro.com/app/board/uXjVOther22=/'}:{})});views.push(fake);return fake.view;
+  }});
+  await assert.rejects(reader({url:BOARD}),{code:'scope_changed'});
+  redirected=false;assert.equal((await reader({url:BOARD})).cached,false);
+  assert.ok(views.every(view=>view.closed()===1));reader.dispose();
+});
+
+test('visitor reader rechecks the actual board before both fresh and cached return boundaries',async()=>{
+  for(const cached of [false,true]){
+    let view,shift=false;
+    const reader=createMiroVisitorReader({pollMs:1,now:()=>{if(shift)view.webContents.getURL=()=> 'https://miro.com/app/board/uXjVOther22=/';return NOW;},
+      createView:()=>{view=fakeView({states:[ready]}).view;return view;}});
+    if(cached)assert.equal((await reader({url:BOARD})).cached,false);
+    shift=true;await assert.rejects(reader({url:BOARD}),{code:'scope_changed'});reader.dispose();
+  }
+});
+
+test('an asynchronously created view arriving after cancellation or disposal is closed once and never navigated',async()=>{
+  for(const dispose of [false,true]){
+    let release,entered;const created=new Promise(resolve=>release=resolve),started=new Promise(resolve=>entered=resolve),fake=fakeView({states:[ready]});
+    const controller=new AbortController(),reader=createMiroVisitorReader({createView:()=>{entered();return created;}});
+    const pending=reader({url:BOARD},controller.signal),rejected=assert.rejects(pending,{code:'cancelled'});
+    await started;if(dispose)reader.dispose();else controller.abort();release(fake.view);await rejected;
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(fake.closed(),1);assert.equal(fake.loads.length,0);reader.dispose();assert.equal(fake.closed(),1);
+  }
 });
 
 test('renderer source hub indexes visitor reads without a Miro account and drops them when the visitor mode disappears',async()=>{

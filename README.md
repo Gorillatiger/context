@@ -31,7 +31,7 @@ Der interaktive Start mit optionalen Connector-Zugangsdaten erfolgt über `pytho
 | --- | --- |
 | Kurse und Wissen | Aufgaben, Markdown-Notizen, Dev Diaries, lokale Suche und Quellen mit Original-Link |
 | Spaces | Direkte WordPress-Suche für Nutzer und Agent ohne Vorabindex, mit Trefferseiten und lesbarer Vorschau; veröffentlichte Beiträge/Seiten pro verknüpftem Kurs. Optionaler Crawler für Offline-Auszüge |
-| Miro | Board-Links mit Fundstellen und Kurszuordnung; Board-Texte benötigen die separat eingerichtete Miro/Nango-Verbindung |
+| Miro | Board-Links mit Fundstellen und Kurszuordnung; Texte öffentlich erreichbarer Boards über die begrenzte Besucheransicht, weitere Zugriffe über die separat eingerichtete Miro/Nango-Verbindung |
 | GitLab und Sciebo | Angemeldete, freigegebene Dienstquellen sowie angebotene Kursdateien; keine vollständige automatische Kopie aller privaten Dateien |
 | Kommunikation | Nachrichtenübersicht, Kursfilter, TH-Mail über IMAP/SMTP, Outlook/Gmail über eine konfigurierte Nango-Verbindung |
 | Kalender | Tag, Monat und Agenda, ICS-Import/Export, Anbieterabgleich mit stabilen IDs; kein allgemeiner Zweiwege-Sync sämtlicher Anbieter |

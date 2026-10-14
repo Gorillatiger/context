@@ -12,17 +12,21 @@ const cancelled=()=>new MiroError('cancelled',499);
  */
 export function createMiroVisitorReader({createView,destroyView,getShareLink=async()=>'',now=()=>new Date().toISOString(),pollMs=1000,timeoutMs=60000,clock=Date.now}={}){
   if(typeof createView!=='function')throw new TypeError('Der Miro-Besucherleser benötigt eine Ansicht.');
-  let queue=Promise.resolve(),closed=false;const cache=new Map(),views=new Set();
+  let queue=Promise.resolve(),closed=false;const cache=new Map(),views=new Set(),closedViews=new WeakSet();
   const check=signal=>{if(closed||signal?.aborted)throw cancelled();};
   const race=(work,signal)=>new Promise((resolve,reject)=>{const abort=()=>reject(cancelled());if(signal?.aborted)return abort();signal?.addEventListener('abort',abort,{once:true});Promise.resolve(work).then(resolve,reject).finally(()=>signal?.removeEventListener('abort',abort));});
   const pause=(ms,signal)=>race(new Promise(resolve=>{const timer=setTimeout(resolve,ms);timer.unref?.();}),signal);
-  const close=view=>{views.delete(view);try{view.webContents.stop();}catch{}try{if(destroyView)destroyView(view);else if(!view.webContents.isDestroyed())view.webContents.close();}catch{}};
+  const close=view=>{views.delete(view);if(!view||typeof view!=='object'||closedViews.has(view))return;closedViews.add(view);try{view.webContents.stop();}catch{}try{if(destroyView)destroyView(view);else if(!view.webContents.isDestroyed())view.webContents.close();}catch{}};
   async function run({url,meta={}},signal){
     const target=safeMiroBoard(url);check(signal);
     const share=await getShareLink(target.id);check(signal);
-    const view=await race(createView({webPreferences:{...providerPreferences(),focusOnNavigation:false}}),signal);views.add(view);
+    const creation=Promise.resolve().then(()=>{check(signal);return createView({webPreferences:{...providerPreferences(),focusOnNavigation:false}});});
+    creation.then(view=>{if(closed||signal?.aborted)close(view);},()=>{});
+    const view=await race(creation,signal);views.add(view);
     try{
+      check(signal);
       const wc=view.webContents;let blocked=false,status=0;
+      const requireBoard=()=>{check(signal);let actual;try{actual=safeMiroBoard(wc.getURL());}catch{}if(actual?.id!==target.id)throw new MiroError('scope_changed',409);};
       view.setVisible?.(false);wc.setBackgroundThrottling?.(false);wc.setAudioMuted?.(true);wc.setWindowOpenHandler?.(()=>({action:'deny'}));
       const guard=(event,next)=>{if(!miroPage(next)){event.preventDefault();blocked=true;}};
       wc.on('will-navigate',guard);wc.on('will-redirect',guard);wc.on('will-attach-webview',event=>event.preventDefault());
@@ -39,6 +43,7 @@ export function createMiroVisitorReader({createView,destroyView,getShareLink=asy
         if(value?.state==='login')throw new MiroError('login_required',401);
         if(value?.state==='no_access')throw new MiroError('no_access',403);
         if(value?.state==='ready'){
+          requireBoard();
           const revision=miroOverviewRevision(value);
           // The overview fills progressively. Accept it after two identical polls
           // (three for an empty board, which may still be loading).
@@ -47,9 +52,11 @@ export function createMiroVisitorReader({createView,destroyView,getShareLink=asy
         if(clock()>deadline)throw new MiroError('overview_unavailable',504);
         await pause(pollMs,signal);
       }
+      requireBoard();
       const revision=miroOverviewRevision(snapshot),key=target.id,metaKey=JSON.stringify([meta.title||'',meta.author||'']),hit=cache.get(key);
-      if(hit?.revision===revision&&hit.metaKey===metaKey){cache.delete(key);cache.set(key,hit);return {...structuredClone(hit.result),fetchedAt:now(),cached:true};}
+      if(hit?.revision===revision&&hit.metaKey===metaKey){const result={...structuredClone(hit.result),fetchedAt:now(),cached:true};requireBoard();cache.delete(key);cache.set(key,hit);return result;}
       const result=parseMiroOverview(snapshot,{url:target.url,meta,now});
+      requireBoard();
       cache.delete(key);cache.set(key,{revision,metaKey,result:structuredClone(result)});while(cache.size>50)cache.delete(cache.keys().next().value);
       return {...result,cached:false};
     }finally{close(view);}
