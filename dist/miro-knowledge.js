@@ -4,7 +4,7 @@ import {platformCatalog} from './source-catalog.js';
 export const miroAvailable=()=>typeof globalThis.window?.contextDesktop?.miro==='function';
 export function requestMiro(action,body,{signal}={}) {
   if(!miroAvailable())return Promise.reject(new Error('Miro-Inhalte benötigen die aktuelle Context-Desktop-App.'));
-  if(!['status','board','meta','remember'].includes(action))return Promise.reject(new Error('Ungültige Miro-Aktion.'));
+  if(!['status','board','meta','remember','shot'].includes(action))return Promise.reject(new Error('Ungültige Miro-Aktion.'));
   const id=globalThis.crypto.randomUUID(),bridge=window.contextDesktop.miro;
   return new Promise((resolve,reject)=>{
     let settled=false;

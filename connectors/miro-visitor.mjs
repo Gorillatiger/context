@@ -132,3 +132,21 @@ export function miroOpenURL(value,share=''){
   if(typeof share!=='string'||!/^[A-Za-z0-9_-]{4,80}$/.test(share))throw fail('invalid_request');
   const link=new URL(url);link.searchParams.set('share_link_id',share);return link.href;
 }
+
+// Screenshots of board areas for the person to check a statement by eye. The
+// image is rendered by Miro itself; it is shown in the chat, never read as
+// text and never given to the language model.
+export const MIRO_SHOT_LIMITS=Object.freeze({width:1280,quality:74,bytes:480000,pixels:4000000});
+// Miro shows cookie and promotion layers for guests; they would cover the board.
+export const MIRO_SHOT_CSS='#onetrust-consent-sdk,#onetrust-banner-sdk,#onetrust-pc-sdk,[id^="CybotCookiebot"],[class*="cookie-banner" i],[data-testid*="cookie" i]{display:none!important}';
+const WIDGET=/^[A-Za-z0-9_=-]{1,128}$/;
+export function miroShotURL(value,itemId='',share=''){
+  const open=new URL(miroOpenURL(value,share));
+  if(itemId){if(typeof itemId!=='string'||!WIDGET.test(itemId))throw fail('invalid_request');open.searchParams.set('moveToWidget',itemId);}
+  return open.href;
+}
+/** Validated shot record: JPEG bytes as base64 plus the geometry shown in the chat. */
+export function validMiroShot(value){
+  if(!object(value)||Object.keys(value).some(key=>!['mime','data','width','height','capturedAt','itemId','settled'].includes(key))||value.mime!=='image/jpeg'||typeof value.data!=='string'||!/^[A-Za-z0-9+/]+={0,2}$/.test(value.data)||value.data.length>Math.ceil(MIRO_SHOT_LIMITS.bytes/3)*4+8||!value.data.startsWith('/9j/')||!Number.isSafeInteger(value.width)||!Number.isSafeInteger(value.height)||value.width<64||value.height<64||value.width>MIRO_SHOT_LIMITS.width||value.width*value.height>MIRO_SHOT_LIMITS.pixels||typeof value.capturedAt!=='string'||!Number.isFinite(Date.parse(value.capturedAt))||typeof value.itemId!=='string'||value.itemId&&!WIDGET.test(value.itemId)||typeof value.settled!=='boolean')throw fail('invalid_response',502);
+  return value;
+}

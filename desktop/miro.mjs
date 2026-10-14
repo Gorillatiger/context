@@ -1,5 +1,5 @@
 import {createMiroBoardClient,MiroError,safeMiroBoard} from '../connectors/miro.mjs';
-import {fetchMiroOEmbed,MIRO_VISITOR_GENERATION} from '../connectors/miro-visitor.mjs';
+import {fetchMiroOEmbed,MIRO_VISITOR_GENERATION,validMiroShot} from '../connectors/miro-visitor.mjs';
 
 const validID=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
 const validProject=value=>typeof value==='string'&&value.length>0&&value.length<=80&&!/[\x00-\x20\x7f]/.test(value);
@@ -52,7 +52,7 @@ export function createDesktopMiro({nango,visitor,shareLinks,fetchMeta=fetchMiroO
       if(!object(body,['urls'])||!urls(body.urls,100))throw new MiroError('invalid_request');
       return shareLinks?shareLinks.remember(body.urls):{remembered:0};
     }
-    if(!['status','board','meta'].includes(action)||requests.has(id)||action==='status'&&body!==undefined||action==='board'&&(!object(body,['url','projectId'])||!validProject(body.projectId))||action==='meta'&&(!object(body,['urls'])||!urls(body.urls,20)))throw new MiroError('invalid_request');
+    if(!['status','board','meta','shot'].includes(action)||requests.has(id)||action==='status'&&body!==undefined||action==='board'&&(!object(body,['url','projectId'])||!validProject(body.projectId))||action==='shot'&&(!object(body,['url','projectId','itemId'])||!validProject(body.projectId)||body.itemId!==undefined&&(typeof body.itemId!=='string'||!/^[A-Za-z0-9_=-]{1,128}$/.test(body.itemId)))||action==='meta'&&(!object(body,['urls'])||!urls(body.urls,20)))throw new MiroError('invalid_request');
     if(requests.size>=2)throw new MiroError('busy',429);
     const controller=new AbortController();requests.set(id,controller);
     try {
@@ -68,6 +68,15 @@ export function createDesktopMiro({nango,visitor,shareLinks,fetchMeta=fetchMiroO
         return {boards};
       }
       const target=safeMiroBoard(body.url),revision=await scope(target.url,body.projectId);
+      if(action==='shot'){
+        // A picture of the board as a visitor sees it; only the public-link view can render it.
+        if(typeof visitor?.capture!=='function')throw new MiroError('not_connected',409);
+        if(controller.signal.aborted)throw new MiroError('cancelled',499);
+        const shot=validMiroShot(await visitor.capture({url:target.url,itemId:body.itemId||''},controller.signal));
+        if(controller.signal.aborted||closed)throw new MiroError('cancelled',499);
+        if(await scope(target.url,body.projectId)!==revision)throw new MiroError('scope_changed',409);
+        return {...shot,url:target.url,projectId:body.projectId,scopeGeneration:revision};
+      }
       if(controller.signal.aborted)throw new MiroError('cancelled',499);
       const value=await board(target,controller.signal);
       if(controller.signal.aborted)throw new MiroError('cancelled',499);

@@ -164,3 +164,15 @@ body.ai-active .context-agent-launcher { display: none; }
 .ki-chat .ki-source-age.old { color: #9a4a00; font-weight: 600; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ki-chat .ki-source-age.old { color: #ffb066; } }
 :root[data-theme="dark"] .ki-chat .ki-source-age.old { color: #ffb066; }
+
+/* Board screenshots under answers */
+.ki-chat .ki-shots { display: grid; gap: 12px; margin: 10px 0 14px; }
+.ki-chat .ki-shot { margin: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--coco-paper); overflow: hidden; }
+.ki-chat .ki-shot-image { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+.ki-chat .ki-shot.open .ki-shot-image { cursor: zoom-out; }
+.ki-chat .ki-shot-image img { display: block; width: 100%; height: auto; max-height: 240px; object-fit: cover; object-position: top left; }
+.ki-chat .ki-shot.open .ki-shot-image img { max-height: none; object-fit: contain; }
+.ki-chat .ki-shot-gone { display: block; padding: 18px 14px; font-size: 12px; color: var(--muted, #6b6b6b); }
+.ki-chat .ki-shot figcaption { display: grid; gap: 4px; justify-items: start; padding: 10px 12px; font-size: 12px; line-height: 1.4; border-top: 1px solid var(--line); }
+.ki-chat .ki-shot figcaption small { font-size: 11px; color: var(--muted, #6b6b6b); }
+.ki-chat .ki-shot-note { margin: 0; font-size: 12px; color: var(--muted, #6b6b6b); }

@@ -52,6 +52,16 @@ Ist im Context-Browser ein Miro-Board geöffnet, zeigt der Assistent oben „Mir
 
 Sind im Assistenten „Browser“ oder „Plattformen“ ausgeschaltet, liest er nichts und sagt, was einzuschalten ist. Der Boardtitel ist für das Modell nur Beschriftung, keine Anweisung.
 
+## Screenshots zum Nachprüfen
+
+Nennt der Assistent Aufgaben, Abgaben, Fristen oder Anweisungen aus einem Miro-Board, hängt er ein Bild des betreffenden Bereichs an die Antwort, damit du es selbst nachlesen und prüfen kannst.
+
+- **Auslöser:** Das Werkzeug `show_board_area {id|title}` (id oder genauer Titel eines gelesenen Bereichs; höchstens 3 je Antwort, keiner doppelt). Hat das Modell es vergessen, nimmt Context für Antworten zu Aufgaben, Abgaben und Fristen bis zu zwei der zitierten Miro-Bereiche nach.
+- **Aufnahme:** Die Desktop-App öffnet das Board als Besucher im unsichtbaren Fenster (wie beim Lesen), springt über `moveToWidget` an den Bereich, wartet bis das Bild zwei Mal gleich und nicht leer ist (meist 5 bis 10 Sekunden), blendet Cookie-Hinweise aus und speichert ein JPEG bis 1280 Pixel Breite und 480 KB. Aufnahme und Lesen laufen nacheinander, nie zwei Boards gleichzeitig.
+- **Anzeige:** Unter der Antwort mit Titel, Boardname, Aufnahmezeit und dem Hinweis, dass sich das Board seitdem geändert haben kann. Klick vergrößert das Bild, „Im Board öffnen“ springt im Context-Browser an genau den Bereich. Gelang die Aufnahme nicht (privat, Anmeldung nötig, Zeitüberschreitung), steht der Grund unter der Antwort; die Antwort selbst bleibt erhalten.
+- **Datenschutz:** Das Bild ist nur für dich bestimmt. Es wird nie an das Sprachmodell gesendet, ist keine Quelle und kommt nicht in Suche, Verlauf, Notizen oder Exporte. Es liegt nur im lokalen, verschlüsselten Chatarchiv (höchstens 3 je Antwort, etwa 7 MB je Chat; ältere Bilder verlieren zuerst ihre Pixel und zeigen einen Hinweis). Es gelten dieselben Kurs- und Quellenprüfungen wie beim Lesen.
+- **Grenzen:** Nur Boards, die ohne Konto per öffentlichem Link (oder im Context-Browser angemeldet) sichtbar sind. Ein Bild beweist, was das Board zur Aufnahmezeit zeigte, nicht, dass der Assistent es richtig gelesen hat; dafür ist es da.
+
 ## Miro-API über Nango
 
 In Nango muss eine Integration mit dem Anbieter **miro** und dem OAuth-Scope **boards:read** eingerichtet sein. Anschließend wird das Miro-Konto in Context verbunden. Miro kann die Zustimmung eines Team-Administrators verlangen; öffentlich sichtbare oder geteilte Board-Links bedeuten nicht automatisch, dass eine OAuth-App darauf zugreifen darf. In diesem Fall greift der Besucherweg.
@@ -72,6 +82,8 @@ Gelesen werden Board-Titel, Beschreibung, Ersteller und Zeitstempel; Texte von S
 Zwei optionale Prüfungen laufen in echtem Electron mit temporärem Profil gegen öffentliche Boards (Netzwerkzugriff, kein Konto):
 
 - `npm run test:miro:electron` – Besucher-Reader mit der Produktions-Ansichtsfabrik; zusätzlich `--expect-denied <url>` für ein Board, das abgewiesen werden muss.
+- `npm run test:miro:shot [--out Ordner] [board-url]` – nur die Bildaufnahme: ganzes Board und ein Bereich als echte JPEGs, geprüft auf Größe, Inhalt und Stabilität.
+- `npm run test:miro:shot:app [--out Ordner] [--narrow] [--dark]` – echte Chat-Oberfläche: Board lesen, Bild aufnehmen, unter der Antwort anzeigen, vergrößern, nach Neuladen aus dem verschlüsselten Archiv wiederherstellen; prüft außerdem, dass keine Bilddaten an das Modell gehen.
 - `npm run test:miro:assistant [board-url]` – gesamte Kette Browser-Tab → `read_current_board` → Kurszuordnung → SourceHub → native Plattform → Besucher-Reader → Antwort mit Frame-Links, inklusive Abweisung eines privaten Boards. Nur das Sprachmodell ist dabei durch feste Antworten ersetzt.
 
 ## Manuell prüfen (Desktop-App)
