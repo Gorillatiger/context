@@ -8,6 +8,7 @@ import {withSnapshot} from './connectors/snapshot.mjs';
 import {createKIClient,KIError} from './connectors/ki.mjs';
 import {createMailClient,MailError} from './connectors/mail.mjs';
 import {ServiceTokenError} from './connectors/service-tokens.mjs';
+import {gitlabRead,GitlabReadError} from './connectors/gitlab-read.mjs';
 
 const root = resolve(import.meta.dirname, 'dist');
 const snapshotPath=process.env.CONTEXT_SNAPSHOT_PATH||resolve(import.meta.dirname,'../../work/private/notifications.json');
@@ -62,7 +63,7 @@ return async (req, res) => {
     if(!validHost(req.headers.host,port)){res.writeHead(403);return res.end('Host rejected');}
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     const mailActions=['connection','folders','list','message','attachment','attachment-link','flag','send'];
-    if(!['GET','HEAD'].includes(req.method)&&!(req.method==='POST'&&(['/api/ai/chat','/api/ai/connection','/api/ai/forget','/api/spaces/search','/api/spaces/read','/api/services/configure','/api/services/forget'].includes(pathname)||mailActions.some(action=>pathname==='/api/mail/'+action)))){res.writeHead(405,{Allow:'GET, HEAD'});return res.end();}
+    if(!['GET','HEAD'].includes(req.method)&&!(req.method==='POST'&&(['/api/ai/chat','/api/ai/connection','/api/ai/forget','/api/spaces/search','/api/spaces/read','/api/services/configure','/api/services/forget','/api/services/gitlab'].includes(pathname)||mailActions.some(action=>pathname==='/api/mail/'+action)))){res.writeHead(405,{Allow:'GET, HEAD'});return res.end();}
     if(pathname.startsWith('/api/')){
       if(!cookieValid(req.headers.cookie,cookieName,sessionToken)||req.headers['sec-fetch-site']==='cross-site'||req.headers.origin&&!['http://127.0.0.1:'+port,'http://localhost:'+port].includes(req.headers.origin))return json(res,403,{error:'session_expired',message:'Die lokale Sitzung ist nicht mehr gültig. Sichere offene Entwürfe und lade den Arbeitsbereich neu.'});
       if(pathname.startsWith('/api/spaces/')){
@@ -114,6 +115,20 @@ return async (req, res) => {
         // Access tokens for the read-only connectors; the token is only ever received, never returned.
         try{
           if(pathname==='/api/services/status'&&req.method==='GET')return json(res,200,services?{available:true,services:await services.status()}:{available:false,services:{}});
+          if(pathname==='/api/services/gitlab'&&req.method==='POST'){
+            // The assistant reads the person's own GitLab: bounded GET operations only.
+            if(req.headers.origin!=='http://'+req.headers.host||req.headers['x-context-request']!=='service-read'){res.writeHead(403);return res.end('Unauthorized');}
+            if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')return json(res,415,{error:'invalid_content_type',message:'Die Anfrage benötigt application/json.'});
+            if(!services)return json(res,503,{error:'not_available',message:'GitLab-Zugriff braucht die Context-Desktop-App.'});
+            const info=(await services.status()).gitlab;if(!info?.configured)return json(res,409,{error:'not_connected',message:'GitLab ist noch nicht verbunden. Verbinde es unter Mitteilungen → Quellen & Status.'});
+            let body;try{body=await chatBody(req,2048);}catch{return json(res,400,{error:'invalid_request',message:'Ungültige Anfrage.'});}
+            if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['op','query','projectId','path'].includes(key))||typeof body.op!=='string')return json(res,400,{error:'invalid_request',message:'Ungültige Anfrage.'});
+            const controller=new AbortController(),cancel=()=>{if(!res.writableEnded)controller.abort();};res.once?.('close',cancel);
+            try{const token=(await services.overrides()).GITLAB_TOKEN;const value=await gitlabRead(body.op,body,{fetcher:services.fetcher,token:token&&token!=='browser-session'?token:'',signal:controller.signal});if(!res.destroyed)return json(res,200,value);}
+            catch(error){if(error instanceof GitlabReadError&&!res.destroyed)return json(res,error.status,{error:error.code,message:error.message});if(!res.destroyed)return json(res,502,{error:'provider_error',message:'GitLab konnte nicht gelesen werden.'});}
+            finally{res.off?.('close',cancel);}
+            return;
+          }
           if(!['/api/services/configure','/api/services/forget'].includes(pathname)||req.method!=='POST'){res.writeHead(405,{Allow:'GET, POST'});return res.end();}
           if(req.headers.origin!=='http://'+req.headers.host||req.headers['x-context-request']!=='service-token'){res.writeHead(403);return res.end('Unauthorized');}
           if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')return json(res,415,{error:'invalid_content_type',message:'Die Anfrage benötigt application/json.'});

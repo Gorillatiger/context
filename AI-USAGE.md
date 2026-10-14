@@ -56,6 +56,10 @@ Fragen zur offenen Seite („dieses Board“, „hier“) und kleine Fragen werd
 
 Braucht eine Kursquelle deine Anmeldung, schreibt der Assistent keine Anleitung. Unter der Antwort erscheint stattdessen eine Karte mit **Anmelden ↗** (öffnet die Quelle im Context-Browser) und **Angemeldet – Frage erneut stellen** (stellt dieselbe Frage noch einmal). Die übrigen Quellen liest er in derselben Antwort weiter.
 
+## GitLab im Assistenten (eigenes Konto)
+
+Ist GitLab unter Mitteilungen → Quellen & Status verbunden (Token oder Browser-Anmeldung), kann der Assistent dein eigenes GitLab lesen, auch ohne Kurs-Verknüpfung: `gitlab_projects` (deine Projekte, auch Forks), `gitlab_tree` (Ordner), `gitlab_file` (Textdatei, z. B. `README.md`, bis 12.000 Zeichen) und `gitlab_commits` (letzte zehn). Typisch: „Wie weit ist meine Abgabe?“ → Fork finden, README und Commits lesen, Stand und Offenes belegen. Ausschließlich lesend, feste Adresse git.coco.study, nur eigene Projekte (Mitgliedschaft). Der Token bleibt im lokalen Server und kommt nie zum Modell oder in die Seite; gelesene Dateien sind Quellen mit Belegkarte „GitLab · eigenes Konto“. Ohne Verbindung gibt es die Werkzeuge nicht; der Assistent sagt dann, dass GitLab zu verbinden ist.
+
 ## Rückfragen und Aktualität (Assistent)
 
 - **Rückfragen:** Das Werkzeug `ask_user` zeigt 2 bis 6 Auswahlfelder (Checkboxen bei Mehrfachauswahl, sonst Auswahlknöpfe) plus ein Feld „Anderes“; die erste Option ist die Empfehlung des Assistenten. Gefragt wird nur, wenn die Antwort das Ergebnis wesentlich ändert und sich nicht durch Lesen klären lässt, höchstens einmal je Auftrag und nie direkt nach einer Antwort (`allowAsk`). Die Auswahl geht als normale Nachricht „Meine Auswahl zu deiner Rückfrage: …“ weiter; der Entwurf im Eingabefeld bleibt erhalten. Beantwortete und unbeantwortete Rückfragen bleiben im Chatarchiv.

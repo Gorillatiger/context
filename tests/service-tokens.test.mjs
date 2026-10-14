@@ -158,3 +158,21 @@ test('without a token the app reads through the browser login: checked, stored a
   // A real token replaces the session mode and goes through the normal check.
   await tokens.configure('mattermost',MM);assert.equal((await tokens.status()).mattermost.origin,'app');
 });
+
+test('the GitLab read endpoint needs the session and header, a connected GitLab and a valid operation',async()=>{
+  const seen=[],fetcher=async(url,options)=>{seen.push({url:String(url),token:options.headers['PRIVATE-TOKEN']});return withHeaders(json(200,String(url).includes('/projects?')?[{id:7,path_with_namespace:'a/b',name:'b',web_url:'https://git.coco.study/a/b'}]:[]));};
+  const tokens=createServiceTokens({stores:{gitlab:memoryStore()},env:{},fetcher}),app=await serve(tokens);
+  try{
+    const read=(body,headers={})=>app.post('/api/services/gitlab',body,{'X-Context-Request':'service-read',...headers});
+    assert.equal((await read({op:'projects'})).status,409,'not connected yet');
+    await tokens.configure('gitlab',GOOD);
+    assert.equal((await realFetch(app.origin+'/api/services/gitlab',{method:'POST'})).status,403);
+    assert.equal((await read({op:'projects'},{'X-Context-Request':'other'})).status,403);
+    assert.equal((await read({op:'projects'},{Origin:'https://evil.example'})).status,403);
+    assert.equal((await read({op:'tree',projectId:7,extra:1})).status,400);assert.equal((await read({op:'file',projectId:7,path:'../x'})).status,400);assert.equal((await read('nope')).status,400);
+    const ok=await read({op:'projects',query:'b'}),value=await ok.json();
+    assert.equal(ok.status,200);assert.equal(value.projects[0].id,7);assert.equal(seen.at(-1).token,GOOD);assert.doesNotMatch(JSON.stringify(value),new RegExp(GOOD));
+    assert.equal((await app.post('/api/services/gitlab',{op:'projects'},{'X-Context-Request':'service-read','Content-Type':'text/plain'})).status,415);
+  }finally{await app.close();}
+  const none=await serve(null);try{assert.equal((await none.post('/api/services/gitlab',{op:'projects'},{'X-Context-Request':'service-read'})).status,503);}finally{await none.close();}
+});
