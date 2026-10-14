@@ -1,0 +1,60 @@
+/* Each mail column owns its scrolling; grid children must be allowed to shrink. */
+.mail-workspace{grid-template-rows:minmax(0,1fr);min-height:0}
+.mail-folders,.mail-list-pane,.mail-reader{min-height:0;min-width:0}
+.mail-folders nav{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain}
+.mail-list-head,.mail-search,.mail-pagination,.mail-account-actions{flex-shrink:0}
+.mail-list-head{padding:14px 14px 10px;gap:6px}
+.mail-list-head>div>span{margin-top:4px}
+.mail-search{margin:0 12px 10px;min-height:40px}
+.mail-search input{min-height:38px;margin:0;padding:8px 0;border:0;border-radius:0;box-shadow:none}
+.mail-search:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.mail-search input:focus-visible{outline:0}
+.mail-pagination{padding:6px 12px}
+.mail-row{padding:14px 14px}
+.mail-row strong{margin:5px 0 7px}
+.mail-list,.mail-reader{scrollbar-gutter:stable;scroll-padding-block:18px}
+.mail-reader{padding-bottom:44px}
+.mail-list:focus-visible,.mail-reader:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.mail-compose-actions{padding-bottom:12px}
+.mail-compose-review>.mail-compose-actions{position:sticky;bottom:-44px;padding:14px 0 22px;background:var(--surface,var(--coco-white));border-top:1px solid var(--line)}
+.mail-compose-back{margin-bottom:16px}
+.mail-files-pending{font-size:12px;color:var(--muted);margin:12px 0}
+body.mail-active .page-shell{height:100dvh;min-height:0;display:flex;flex-direction:column}
+body.mail-active .topbar{flex-shrink:0}
+body.mail-active main{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;padding:22px 28px 12px;overflow:auto}
+body.mail-active .mail-heading{display:flex;flex-shrink:0;align-items:center;margin-bottom:18px;gap:16px}
+body.mail-active .mail-heading h1{font-size:clamp(26px,2.7vw,36px);line-height:1.2}
+body.mail-active .mail-heading .eyebrow{margin-bottom:10px}
+body.mail-active .mail-heading h1{margin:0}
+body.mail-active .mail-heading .page-description{margin-top:8px;font-size:12px}
+body.mail-active .mail-workspace{flex:1;height:auto;min-height:220px}
+body.mail-active .mail-alert,body.mail-active .mail-notice{flex-shrink:0;max-height:100px;overflow:auto;margin-bottom:12px}
+body.mail-active .mail-privacy{flex-shrink:0;margin-top:10px;font-size:10px}
+.mail-privacy summary{cursor:pointer;min-height:24px;line-height:24px;color:var(--muted)}
+.mail-privacy>p{padding:8px 0;max-height:100px;overflow:auto}
+body.mail-active .page-footer{flex-shrink:0;padding:8px 28px;font-size:10px}
+body.mail-active .context-agent-launcher{bottom:10px;right:12px}
+@media(max-width:1080px){.mail-workspace{grid-template-rows:auto minmax(0,1fr)}.mail-folders{overflow:hidden}.mail-folders nav{flex-basis:0}.mail-account-actions{margin-top:0}}
+@media(max-width:700px){
+  body.mail-active main{padding:16px 14px 10px}
+  body.mail-active .mail-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin-bottom:12px}
+  body.mail-active .mail-heading .eyebrow{display:none}
+  body.mail-active .mail-heading h1{font-size:24px}
+  body.mail-active .mail-heading .page-description{overflow-wrap:anywhere}
+  body.mail-active .mail-heading>.button{max-width:150px;padding:10px 12px;font-size:12px}
+  body.mail-active .mail-heading>.button{margin-top:0}
+  body.mail-active .mail-workspace{min-height:240px;overflow:hidden}
+  .mail-folders{flex-shrink:0;padding:8px;gap:4px}
+  .mail-folders nav{flex:1 0 100%;overflow:auto}
+  .mail-folders nav button{min-height:40px;padding:10px 8px}
+  .mail-account-actions{padding:2px 4px;gap:18px}
+  .mail-account-actions button{min-height:32px}
+  .mail-list-pane,.mail-reader{flex:1;min-height:0}
+  .mail-list{flex:1;max-height:none;min-height:0}
+  .mail-has-detail .mail-reader{display:block;overflow:auto}
+  .mail-message,.mail-compose,.mail-compose-review{min-height:0;padding:20px 16px}
+  .mail-reader{padding-bottom:38px}
+  .mail-compose-actions{padding-right:44px}
+  body.mail-active .page-footer{padding:8px 14px}
+  body.mail-active .mail-privacy{font-size:10px}
+}

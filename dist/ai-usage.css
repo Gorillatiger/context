@@ -1,0 +1,13 @@
+.ki-chat-status{flex-wrap:wrap;gap:6px 10px}
+.ki-chat .ki-chat-status>.ki-usage-toggle{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:3px 8px;border:1px solid var(--line);border-radius:20px;max-width:100%;color:var(--ink);background:var(--coco-white);text-decoration:none}
+.ki-usage-toggle span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ki-chat .ki-chat-status>.ki-usage-toggle.is-warning{color:var(--accent);border-color:var(--accent)}
+.ki-usage-panel meter{display:block;width:100%;height:14px;margin:8px 0 16px;accent-color:var(--accent)}
+.ki-usage-actions{display:flex;gap:4px}
+.ki-usage-values{margin:0}
+.ki-usage-values>div{display:flex;gap:16px;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+.ki-usage-values dt{color:var(--muted);font-size:12px;line-height:1.5;min-width:0}
+.ki-usage-values dd{margin:0;color:var(--ink);font-size:13px;line-height:1.5;text-align:right;overflow-wrap:anywhere;max-width:65%}
+.ki-usage-note{font-size:11px;line-height:1.5;color:var(--muted);margin:12px 0 0}
+.ki-usage-error{font-size:12px;line-height:1.5;color:var(--accent);margin:12px 0 0}
+@media(max-width:700px){.ki-chat .ki-chat-status>.ki-usage-toggle{min-height:44px}.ki-usage-values>div{gap:10px}.ki-usage-values dd{max-width:60%}}

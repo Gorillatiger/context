@@ -1,0 +1,262 @@
+@charset "UTF-8";
+
+/* Load after the feature styles. Only Context's document is themed here;
+   embedded websites keep their own document, colours and browser session. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --theme-canvas: oklch(0.199 0.010 341.331);
+  --theme-surface: oklch(0.232 0.006 17.194);
+  --theme-raised: oklch(0.261 0.014 8.543);
+  --theme-wash: oklch(0.285 0.022 10.224);
+  --theme-selected: oklch(0.315 0.032 5.066);
+  --theme-text: oklch(0.952 0.012 343.842);
+  --theme-muted: oklch(0.825 0.035 1.633);
+  --theme-caption: oklch(0.815 0.035 2.456);
+  --theme-accent: oklch(0.825 0.080 4.609);
+  --accent-fill: oklch(0.475 0.110 4.609);
+  --accent-fill-hover: oklch(0.530 0.118 5.884);
+  --on-accent: oklch(0.974 0.013 4.609);
+  --on-accent-muted: oklch(0.925 0.038 4.609);
+  --theme-error: oklch(0.850 0.082 14.161);
+  --theme-error-bg: oklch(0.310 0.040 14.161);
+  --theme-error-border: oklch(0.590 0.075 14.161);
+  --theme-success-border: oklch(0.535 0.035 155.593);
+  --theme-warning-border: oklch(0.590 0.063 50.686);
+  --theme-backdrop: oklch(0.144 0.013 346.720 / 0.761);
+  --theme-logo-surface: oklch(0.996 0.001 17.194);
+
+  /* Surface lightness is reversed from the light palette; semantic hues
+     retain their light equivalents and chroma stays inside sRGB.
+     Existing names stay compatible; "white" is a surface, never button text. */
+  --coco-white: var(--theme-surface);
+  --coco-paper: var(--theme-raised);
+  --coco-rose: var(--theme-wash);
+  --coco-rose-deep: var(--theme-selected);
+  --coco-burgundy: var(--theme-accent);
+  --coco-burgundy-hover: oklch(0.906 0.051 4.609);
+  --coco-ink: var(--theme-text);
+  --coco-muted: var(--theme-muted);
+  --coco-caption: var(--theme-caption);
+  --coco-coral: oklch(0.780 0.100 23.627);
+  --coco-coral-soft: oklch(0.380 0.060 14.390);
+  --coco-outline: oklch(0.535 0.040 5.091);
+  --coco-control-outline: oklch(0.620 0.042 3.752);
+  --coco-divider: oklch(0.355 0.027 4.282);
+  --coco-success: oklch(0.820 0.045 155.593);
+  --coco-success-bg: oklch(0.300 0.026 134.898);
+  --coco-warning: oklch(0.845 0.080 50.686);
+  --coco-warning-bg: oklch(0.325 0.035 74.314);
+  --bg: var(--theme-canvas);
+  --surface: var(--theme-surface);
+  --ink: var(--theme-text);
+  --muted: var(--theme-muted);
+  --line: var(--coco-divider);
+  --accent: var(--theme-accent);
+  --sage: var(--theme-wash);
+  --pink: var(--theme-selected);
+  background: var(--theme-canvas);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] body {
+  background: linear-gradient(180deg, var(--theme-canvas), oklch(0.228 0.012 8.543) 70vh, oklch(0.270 0.020 5.066) 160vh);
+  background-attachment: fixed;
+  color: var(--theme-text);
+}
+html[data-theme="dark"] ::selection { background: oklch(0.445 0.070 4.609); color: var(--on-accent); }
+html[data-theme="dark"] :is(input, textarea, select, progress) { color-scheme: dark; }
+html[data-theme="dark"] :is(input[type="checkbox"], input[type="radio"], progress) { accent-color: var(--theme-accent); }
+html[data-theme="dark"] :is(button, a, input, select, textarea, summary):focus-visible { outline-color: var(--theme-accent); }
+
+/* Filled states use their own burgundy, independent of pink link text. */
+html[data-theme="dark"] :is(
+  .skip-link, .button.primary, .nav-item.active, .filter.selected,
+  .task-check.checked, .connected-panel, .companion-focus,
+  .context-agent-launcher, .context-agent-header, .art-center,
+  .project-agent-button[aria-expanded="true"],
+  .mail-folders nav button[aria-current], .mail-unread-toggle[aria-pressed="true"],
+  .calendar-view-switch button[aria-pressed="true"],
+  .calendar-view-switch button[aria-selected="true"],
+  .calendar-day.is-today .calendar-day-number, .calendar-day.is-today > time,
+  .browser-controls .browser-assistant-button, .speech-mic.is-recording
+) {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
+}
+html[data-theme="dark"] :is(
+  .button.primary:hover, .nav-item.active:hover, .filter.selected:hover,
+  .context-agent-launcher:hover, .project-agent-button[aria-expanded="true"]:hover,
+  .mail-folders nav button[aria-current]:hover, .mail-unread-toggle[aria-pressed="true"]:hover,
+  .calendar-view-switch button[aria-pressed="true"]:hover,
+  .calendar-view-switch button[aria-selected="true"]:hover,
+  .browser-controls .browser-assistant-button:hover, .speech-mic.is-recording:hover
+) {
+  background: var(--accent-fill-hover);
+  border-color: var(--accent-fill-hover);
+  color: var(--on-accent);
+}
+html[data-theme="dark"] :is(.connected-panel, .companion-focus) :is(h2, .text-link) { color: var(--on-accent); }
+html[data-theme="dark"] :is(.connected-panel, .companion-focus) :is(p, .small-label) { color: var(--on-accent-muted); }
+html[data-theme="dark"] .nav-item.active .nav-count { background: oklch(0.330 0.055 4.609); color: var(--on-accent); }
+html[data-theme="dark"] .task-check { background: var(--theme-surface); }
+html[data-theme="dark"] .task-check.checked { background: var(--accent-fill); }
+
+html[data-theme="dark"] .sidebar { background: linear-gradient(180deg, var(--theme-surface), oklch(0.281 0.022 5.066)); }
+html[data-theme="dark"] .topbar { background: var(--theme-surface); }
+html[data-theme="dark"] :is(.workspace, .search-trigger, .course-switch select) { border-color: var(--coco-control-outline); }
+html[data-theme="dark"] .sidebar-tools a:hover { background: var(--theme-selected); }
+html[data-theme="dark"] :is(.workspace-avatar, .user-avatar, .nav-count, kbd) { background: var(--theme-selected); color: var(--theme-accent); }
+html[data-theme="dark"] :is(.breadcrumb strong, .local-indicator, .privacy-note, .section-title button, .page-footer button) { color: var(--theme-muted); }
+html[data-theme="dark"] .section-title button:hover { color: var(--theme-accent); }
+
+/* Service artwork remains in its original palette on a small light island.
+   Hover washes belong to Context and are deliberately dark. */
+html[data-theme="dark"] .tool-icon.brand-logo { background: var(--theme-logo-surface); border-color: oklch(0.630 0.054 354.396); color-scheme: light; }
+html[data-theme="dark"] .service-spaces { --service-wash: oklch(0.287 0.025 61.349); --service-accent: oklch(0.825 0.103 43.760); }
+html[data-theme="dark"] :is(.service-mattermost, .service-signal, .service-outlook, .service-googlecalendar, .service-zoom) { --service-wash: oklch(0.287 0.025 264.511); --service-accent: oklch(0.825 0.086 262.687); }
+html[data-theme="dark"] .service-gitlab { --service-wash: oklch(0.290 0.028 39.420); --service-accent: oklch(0.827 0.098 35.766); }
+html[data-theme="dark"] :is(.service-sciebo, .service-whatsapp) { --service-wash: oklch(0.304 0.026 149.250); --service-accent: oklch(0.833 0.068 148.064); }
+html[data-theme="dark"] .service-miro { --service-wash: oklch(0.309 0.024 93.097); --service-accent: oklch(0.852 0.091 87.073); }
+html[data-theme="dark"] .service-obsidian { --service-wash: oklch(0.285 0.035 306.665); --service-accent: oklch(0.826 0.090 298.721); }
+html[data-theme="dark"] :is(.service-openrouter, .service-github) { --service-wash: oklch(0.315 0.025 345.281); --service-accent: oklch(0.852 0.033 344.072); }
+html[data-theme="dark"] :is(.service-webmail, .service-kiconnect) { --service-wash: var(--theme-selected); --service-accent: var(--theme-accent); }
+html[data-theme="dark"] .quick-tools { background: var(--theme-surface); border-color: var(--coco-outline); }
+html[data-theme="dark"] :is(.quick-tool, .plugin-card, .tool-card) {
+  background: linear-gradient(180deg, var(--theme-raised), var(--theme-surface));
+  border-color: var(--coco-outline);
+}
+html[data-theme="dark"] .quick-tool { border-color: var(--coco-divider); }
+html[data-theme="dark"] :is(.quick-tool:hover, .quick-tool:focus-visible) { background: var(--service-wash, var(--theme-selected)); }
+html[data-theme="dark"] :is(.quick-tool > span:not(.tool-icon), .quick-tool > svg, .plugin-card > p, .tool-card > p) { color: var(--theme-muted); }
+html[data-theme="dark"] .quick-tool:hover > svg { color: var(--service-accent, var(--theme-accent)); }
+html[data-theme="dark"] :is(.violet:not(.brand-logo), .tile-sp) { background: oklch(0.302 0.035 329.506); color: oklch(0.834 0.076 330.725); }
+html[data-theme="dark"] :is(.peach:not(.brand-logo), .tile-gl) { background: oklch(0.301 0.028 36.865); color: oklch(0.837 0.072 38.008); }
+html[data-theme="dark"] :is(.blue:not(.brand-logo), .tile-mm) { background: oklch(0.308 0.026 238.014); color: oklch(0.846 0.051 237.772); }
+html[data-theme="dark"] :is(.green:not(.brand-logo), .tile-sc) { background: oklch(0.320 0.027 130.017); color: oklch(0.845 0.066 133.924); }
+html[data-theme="dark"] .yellow:not(.brand-logo) { background: oklch(0.324 0.028 87.565); color: oklch(0.856 0.079 74.064); }
+
+/* Form, connection and deadline states must remain readable on dark panels. */
+html[data-theme="dark"] :is(.danger, .due.overdue, .board-error, .companion-deadline.overdue, .companion-deadline.today,
+  .calendar-event-actions .text-link.danger, .calendar-event-meta .overdue,
+  .chat-archive-bar > .chat-storage-error, .ki-compact-layout .compact-chat-archive > summary .chat-storage-error) { color: var(--theme-error); }
+html[data-theme="dark"] :is(.mail-alert, .form-error, .ki-error, .browser-error, .speech-error,
+  .calendar-warning.error, .calendar-warning[role="alert"], .calendar-provider-status.error) {
+  background: var(--theme-error-bg);
+  color: var(--theme-error);
+  border-color: var(--theme-error-border);
+}
+html[data-theme="dark"] :is(.mail-notice, .submission-success, .calendar-notice) { border-color: var(--theme-success-border); }
+html[data-theme="dark"] .calendar-warning:not(.error):not([role="alert"]) { border-color: var(--theme-warning-border); }
+html[data-theme="dark"] .calendar-provider-card .calendar-provider-status.connected {
+  background: var(--coco-success-bg);
+  color: var(--coco-success);
+  border-color: var(--theme-success-border);
+}
+html[data-theme="dark"] .calendar-provider-card .calendar-provider-status.error {
+  background: var(--theme-error-bg);
+  color: var(--theme-error);
+  border-color: var(--theme-error-border);
+}
+html[data-theme="dark"] .source-status-dot { background: var(--theme-caption); }
+html[data-theme="dark"] .notification-row > .icon-button.is-read { color: var(--coco-success); }
+
+/* Notes, rendered Markdown and messages share the same reading contrast. */
+html[data-theme="dark"] :is(.markdown-content, .message-text, .mail-body, .ki-user-text) { color: var(--theme-text); }
+html[data-theme="dark"] .markdown-content :is(pre, code) { background: oklch(0.313 0.028 5.066); color: oklch(0.875 0.055 4.609); }
+html[data-theme="dark"] .markdown-content pre code { background: transparent; }
+html[data-theme="dark"] .markdown-content blockquote { color: var(--theme-muted); border-color: var(--coco-control-outline); }
+html[data-theme="dark"] .markdown-content hr { border-color: var(--coco-divider); }
+html[data-theme="dark"] .markdown-content :is(th, td) { border-color: var(--coco-divider); }
+html[data-theme="dark"] .markdown-content th { background: var(--theme-wash); }
+html[data-theme="dark"] .markdown-content a:hover { color: var(--coco-burgundy-hover); }
+html[data-theme="dark"] .context-agent-content > .ki-connection a { color: var(--theme-accent); }
+html[data-theme="dark"] .message-excerpt-note { background: var(--coco-warning-bg); color: var(--coco-warning); }
+
+/* Keep mail reading, drafting, attachment chips and selected folders consistent. */
+html[data-theme="dark"] :is(.mail-workspace, .mail-setup, .mail-row, .mail-compose) { background: var(--theme-surface); }
+html[data-theme="dark"] .mail-row:hover { background: var(--theme-raised); }
+html[data-theme="dark"] .mail-row.selected { background: var(--theme-selected); }
+html[data-theme="dark"] .mail-folders nav button[aria-current] span { color: var(--on-accent); }
+html[data-theme="dark"] .mail-attachments button:hover { background: var(--theme-selected); }
+html[data-theme="dark"] :is(.mail-setup input, .mail-compose input, .mail-search) { border-color: var(--coco-control-outline); }
+
+/* Agent surfaces inherit tokens, with an explicit contrast colour in the header. */
+html[data-theme="dark"] .context-agent-header :is(strong, .text-link, .context-agent-new, .context-agent-close) { color: var(--on-accent); }
+html[data-theme="dark"] :is(.context-agent-mark, .context-agent-header > div > span) { color: var(--on-accent-muted); }
+html[data-theme="dark"] :is(.context-agent-new, .context-agent-close) { background: transparent; border-color: oklch(0.750 0.070 356.400); }
+html[data-theme="dark"] .context-agent-header :is(.text-link, .context-agent-new, .context-agent-close):hover {
+  background: var(--accent-fill-hover);
+  color: var(--on-accent);
+}
+html[data-theme="dark"] .context-agent-header :is(.text-link, button):focus-visible { outline-color: var(--on-accent); }
+html[data-theme="dark"] .context-agent-panel.docked { background: var(--theme-surface); }
+html[data-theme="dark"] :is(.ki-workspace, .ki-thread, .ki-message.assistant) { background: var(--theme-surface); }
+html[data-theme="dark"] .ki-message.user { background: var(--theme-wash); }
+html[data-theme="dark"] .ki-thinking .tiny-dot { background: var(--theme-accent); }
+html[data-theme="dark"] :is(.ki-composer textarea, .ki-setup input) { color: var(--theme-text); }
+html[data-theme="dark"] .ki-compact-layout .ki-composer textarea { border-color: var(--coco-control-outline); }
+html[data-theme="dark"] .ki-source:hover { color: var(--theme-text); }
+html[data-theme="dark"] .markdown-content .ki-citation:hover { color: var(--coco-burgundy-hover); }
+
+/* Only the app-owned browser frame and its empty/loading surfaces are styled.
+   No filter, webview selector, injected CSS or remote-page preference is used. */
+html[data-theme="dark"] :is(.context-browser, .browser-page-slot, .native-browser-slot, .browser-start) { background: var(--theme-surface); }
+html[data-theme="dark"] :is(.browser-tabbar, .browser-controls, .browser-footer, .space-toolbar) { border-color: var(--coco-divider); }
+html[data-theme="dark"] .browser-tabbar { background: var(--theme-wash); }
+html[data-theme="dark"] .browser-tabs { background: transparent; }
+html[data-theme="dark"] .browser-tab { color: var(--theme-muted); }
+html[data-theme="dark"] .browser-tab.selected { background: var(--theme-raised); color: var(--theme-accent); }
+html[data-theme="dark"] .browser-controls #browser-address-form { background: var(--theme-surface); border-color: var(--coco-control-outline); }
+html[data-theme="dark"] .browser-controls #browser-address { color: var(--theme-text); }
+html[data-theme="dark"] .browser-controls .browser-assistant-button[aria-expanded="true"] {
+  background: var(--theme-selected);
+  color: var(--theme-accent);
+  border-color: var(--coco-outline);
+}
+html[data-theme="dark"] .browser-controls .browser-assistant-button[aria-expanded="true"]:hover { background: oklch(0.350 0.034 5.066); }
+
+/* Boards and the inventory entry are local Context panels. */
+html[data-theme="dark"] .board-summary { background: var(--coco-warning-bg); border-color: var(--theme-warning-border); }
+html[data-theme="dark"] :is(.board-card, .board-ai, .inventory-entry) { background: var(--theme-raised); border-color: var(--coco-outline); }
+html[data-theme="dark"] :is(.board-card h2, .board-ai h2, .inventory-entry h2) { color: var(--theme-accent); }
+html[data-theme="dark"] .board-summary strong { color: var(--theme-text); }
+html[data-theme="dark"] .inventory-entry p { color: var(--theme-muted); }
+html[data-theme="dark"] .board-edit-dialog { background: var(--theme-surface); border-color: var(--coco-outline); }
+
+/* Speech recording and recognition use distinct, legible active/error states. */
+html[data-theme="dark"] .speech-input { background: var(--theme-raised); }
+html[data-theme="dark"] .speech-interim { background: var(--theme-wash); border-left-color: var(--theme-accent); }
+html[data-theme="dark"] .speech-interim p { color: var(--theme-text); }
+html[data-theme="dark"] .speech-settings { border-color: var(--coco-divider); }
+html[data-theme="dark"] .speech-setting-grid select { color: var(--theme-text); background: var(--theme-surface); border-color: var(--coco-control-outline); }
+html[data-theme="dark"] .speech-options input[type="checkbox"] { accent-color: var(--theme-accent); }
+html[data-theme="dark"] .speech-download progress { accent-color: var(--theme-accent); }
+html[data-theme="dark"] .speech-input :is(button, input, select, summary):focus-visible { outline-color: var(--theme-accent); }
+
+/* Dialogs keep their existing sizes and clipping measurements. */
+html[data-theme="dark"] dialog { background: var(--theme-surface); color: var(--theme-text); }
+html[data-theme="dark"] dialog::backdrop { background: var(--theme-backdrop); }
+html[data-theme="dark"] body.native-project-open::after,
+html[data-theme="dark"] .nav-open::after { background: var(--theme-backdrop); }
+html[data-theme="dark"] .project-workspace .modal-head { background: var(--theme-surface); }
+html[data-theme="dark"] #toast { background: var(--accent-fill); color: var(--on-accent); }
+html[data-theme="dark"] #toast button { color: var(--on-accent); }
+html[data-theme="dark"] #toast button:hover { color: var(--on-accent-muted); }
+
+/* Respect system high-contrast colours even when Dark is selected. */
+@media (forced-colors: active) {
+  html[data-theme="dark"] { color-scheme: light dark; }
+  html[data-theme="dark"] :is(.nav-item.active, .filter.selected, .task-check.checked,
+    .mail-folders nav button[aria-current], .mail-unread-toggle[aria-pressed="true"],
+    .calendar-view-switch button[aria-pressed="true"], .calendar-view-switch button[aria-selected="true"],
+    .calendar-day.is-today .calendar-day-number, .calendar-day.is-today > time) {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+  html[data-theme="dark"] :is(.nav-item.active .nav-count, .mail-folders nav button[aria-current] span) { color: HighlightText; }
+  html[data-theme="dark"] :is(.project-card, .bookmark-card, .tool-card, .note-card, .plugin-card,
+    .companion-course, .companion-finding, .context-agent-panel, .calendar-month, .calendar-provider-card, dialog) { box-shadow: none; }
+  html[data-theme="dark"] :is(.calendar-day.is-selected, button.calendar-day.is-selected:hover) { border-color: Highlight; box-shadow: inset 0 0 0 1px Highlight; }
+}

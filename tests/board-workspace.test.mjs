@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {initialState,validateState,searchState} from '../dist/core.js';
+import {boardFinding} from '../dist/board-index.js';
+import {buildKnowledge} from '../dist/knowledge.js';
+import {citationIds,citationsToMarkdown} from '../dist/citations.js';
+test('directory metadata round trips in workspace backups and enters scoped assistant knowledge with working source citations',()=>{const w=initialState(),b=boardFinding({url:'https://miro.com/app/board/abcd/',title:'Kursboard',postedBy:'Anna',postedAt:'2026-10-12T10:00:00Z'},{id:'post',projectId:'prototyping',url:'https://spaces.th-koeln.de/prototyping-things-w26/',title:'Kursmaterial',kind:'spaces'});w.boardFindings=[b];const restored=validateState(w);assert.deepEqual(restored.boardFindings,w.boardFindings);assert.equal(searchState(restored,'Kursboard')[0].type,'board');const docs=buildKnowledge(restored,[],{projectId:'prototyping'}),doc=docs.find(d=>d.source==='Miro-Verzeichnis');assert.ok(doc);assert.match(doc.text,/Board-Ersteller: unbekannt/);assert.deepEqual(citationIds('['+doc.id+']'),[doc.id]);assert.match(citationsToMarkdown('['+doc.id+']',[doc]),/https:\/\/spaces/);assert.equal(buildKnowledge(restored,[],{projectId:'go-public'}).filter(d=>d.source==='Miro-Verzeichnis').length,0);});
+test('older backups migrate the inventory into the pinned tools without inventing board metadata',()=>{const w=initialState();delete w.boardFindings;w.tools=w.tools.filter(t=>t.id!=='inventory');const out=validateState(w);assert.equal(out.tools.find(t=>t.id==='inventory').pinned,true);assert.deepEqual(out.boardFindings,[]);});

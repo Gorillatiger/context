@@ -1,0 +1,15 @@
+.mail-compose .mail-address-line{align-items:flex-start}
+.mail-address-line>label{width:27px;flex:0 0 27px;padding-top:12px;color:var(--muted);font-size:12px}
+.mail-recipient-control{flex:1;min-width:0}
+.mail-compose .mail-recipient-control input{width:100%;min-height:44px}
+.mail-recipient-list{border:1px solid var(--line);background:var(--coco-white);border-radius:8px;margin:5px 0 6px;padding:4px;max-height:min(244px,35dvh);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.mail-recipient-list[hidden]{display:none}
+.mail-contact-option{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px;border:0;background:transparent;color:var(--ink);border-radius:5px;text-align:left}
+.mail-contact-option:hover,.mail-contact-option.selected{background:var(--coco-rose)}
+.mail-recipient-list .mail-contact-avatar{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--coco-rose);color:var(--accent);font-size:12px}
+.mail-recipient-list .mail-contact-name{flex:1;min-width:0;width:auto;white-space:normal}
+.mail-contact-name strong{display:block;font-size:13px;font-weight:500;line-height:1.4;overflow-wrap:anywhere}
+.mail-contact-name small{display:block;margin-top:2px;font-size:11px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere}
+.mail-contact-option:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+@media(max-width:700px){.mail-recipient-control input{font-size:16px}.mail-contact-name small{font-size:12px}}
+@media(forced-colors:active){.mail-contact-option.selected{outline:1px solid Highlight}}

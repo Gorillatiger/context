@@ -1,0 +1,63 @@
+/* Original brand colours live inside the images; Context owns the surfaces. */
+.tool-icon.brand-logo {
+  width: 48px;
+  height: 48px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #ead7dc;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+.brand-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.tool-icon.brand-logo.small { width: 28px; height: 28px; padding: 4px; border-radius: 7px; }
+.tool-icon.brand-pair { width: 82px; gap: 9px; }
+.brand-pair img { width: calc(50% - 4.5px); }
+.tool-icon.brand-pair.small { width: 48px; gap: 5px; }
+.brand-pair.small img { width: calc(50% - 2.5px); }
+.brand-kiconnect, .brand-zoom { min-width: 72px; }
+.brand-kiconnect.small, .brand-zoom.small { min-width: 38px; }
+.module-icon svg { width: 58%; height: 58%; }
+
+.service-spaces { --service-accent: #e65c00; --service-wash: #fff5ed; }
+.service-mattermost { --service-accent: #1c58d9; --service-wash: #f0f4fc; }
+.service-gitlab { --service-accent: #d74921; --service-wash: #fff3ef; }
+.service-sciebo, .service-whatsapp { --service-accent: #087c31; --service-wash: #eff7f0; }
+.service-signal, .service-outlook, .service-googlecalendar, .service-zoom { --service-accent: #2454aa; --service-wash: #f0f4fc; }
+.service-miro { --service-accent: #745800; --service-wash: #fff9e5; }
+.service-obsidian { --service-accent: #6c36b3; --service-wash: #f5effc; }
+.service-openrouter, .service-github { --service-accent: #43383e; --service-wash: #f4f0f2; }
+.service-webmail, .service-kiconnect { --service-accent: var(--coco-burgundy); --service-wash: var(--coco-paper); }
+
+.quick-tools {
+  background: var(--coco-white);
+  border-color: #caa4ae;
+  border-radius: 12px;
+}
+.quick-tool {
+  padding: 24px 20px;
+  gap: 0;
+  border-color: #ead7dc;
+  background: linear-gradient(180deg, var(--coco-white), #fff9fa);
+}
+.quick-tool .brand-logo { width: 56px; height: 56px; padding: 10px; }
+.quick-tool .brand-pair { width: 92px; }
+.quick-tool strong { margin-top: 20px; font-size: 15px; font-weight: 600; color: var(--coco-burgundy); }
+.quick-tool > span:not(.tool-icon) { white-space: normal; line-height: 1.5; color: #694750; }
+.quick-tool > svg { top: 24px; right: 20px; color: #77515d; }
+.quick-tool:hover, .quick-tool:focus-visible { background: var(--service-wash, var(--coco-rose)); }
+.quick-tool:hover .brand-logo, .quick-tool:focus-visible .brand-logo { border-color: var(--service-accent, var(--coco-outline)); }
+.quick-tool:hover > svg { color: var(--service-accent, var(--coco-burgundy)); }
+.sidebar-tools a { border-radius: 8px; }
+.sidebar-tools a:hover { background: #fff4f6; }
+.plugin-card, .tool-card { background: linear-gradient(180deg, var(--coco-white), #fff8fa); border-color: #caa4ae; }
+.plugin-card h2, .tool-card h2 { color: var(--coco-burgundy); }
+.plugin-card > p, .tool-card > p { color: #694750; }
+.provider-brand-heading { display: flex; align-items: center; gap: 12px; }
+.provider-brand-heading h3 { margin: 0; }
+
+@media (max-width: 760px) {
+  .quick-tool { padding: 20px 16px; }
+  .quick-tool .brand-logo { width: 48px; height: 48px; padding: 8px; }
+  .quick-tool strong { font-size: 14px; margin-top: 16px; }
+  .quick-tool > svg { right: 16px; top: 20px; }
+}

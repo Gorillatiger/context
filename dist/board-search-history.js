@@ -1,0 +1,14 @@
+import {cleanChat} from './chat-archive.js';
+import {redactKnowledge} from './knowledge.js';
+import {validateBoardFindings,boardKnowledgeKey} from './board-index.js';
+
+// Store a host-written search report, never an untrusted model narrative or page body.
+export function boardSearchChat(run,{id=crypto.randomUUID(),now=new Date().toISOString(),projectName='Alle Kurse'}={}){
+ const findings=validateBoardFindings(run.findings||[]),sources=[...new Map(findings.map(f=>[f.id,{id:'p:'+boardKnowledgeKey(f.id),kind:'projects',title:f.customTitle||f.title,text:redactKnowledge(`Boardlink: ${f.url}\nFundstelle: ${f.sourceTitle}\nLink gepostet von: ${f.postedBy||'unbekannt'}\nBeitrag vom: ${f.postedAt||'unbekannt'}\nBoard-Ersteller: unbekannt\nTitelherkunft: ${f.titleOrigin}`),url:f.sourceURL||f.url,projectId:f.projectId,status:'metadata',source:'Miro-Verzeichnis'}])).values()].slice(0,100);
+ const coverage=(run.coverage||[]).slice(0,40),pages=coverage.reduce((sum,c)=>sum+(Number.isSafeInteger(c.pages)&&c.pages>=0?c.pages:0),0),open=coverage.filter(c=>c.status!=='read').length;
+ const settled=(run.steps||[]).filter((s,i,all)=>s.status!=='working'||!all.some((next,j)=>j>i&&next.projectId===s.projectId&&next.status!=='working'));
+ const steps=[...settled.slice(0,16).map(s=>({tool:'prioritize_course_views',label:'Kursansichten priorisieren',detail:redactKnowledge(`${s.projectId}: ${s.message}`).slice(0,500),status:s.status==='working'?'error':s.status==='ranked'?'done':'error'})),...coverage.map(c=>({tool:'read_course_views',label:'Kursansichten prüfen',detail:redactKnowledge(`${c.projectId} · ${c.pages} Ansichten · ${c.message}`).slice(0,500),status:c.status==='read'?'done':'error'}))].slice(0,50).map((s,i)=>({...s,id:i}));
+ const boards=new Set(findings.map(f=>f.url)).size;
+ const summary=`${run.interrupted?'Suche angehalten.':'Suchlauf abgeschlossen.'} ${boards} ${boards===1?'belegter Boardlink':'belegte Boardlinks'} in diesem Lauf, ${pages} gelesene Kursansichten. ${open} ${open===1?'Kurs':'Kurse'} mit offenen Ansichten oder Zugriffslücken. Dateianhänge, Bilder und nicht angebotene Inhalte können fehlen.${findings.length>100?' Das Protokoll zeigt höchstens 100 Fundstellen; das Board-Verzeichnis enthält die gespeicherten Metadaten.':''}${run.error?' Hinweis: '+redactKnowledge(run.error).slice(0,400):''}`;
+ return cleanChat({version:1,id,title:'Miro-Boards · KI-Suche',scope:run.scope||'',projectName:redactKnowledge(projectName),createdAt:run.startedAt||now,updatedAt:now,provider:run.provider,model:run.model,enabled:{projects:true},browserEnabled:true,calendarDirect:false,interrupted:false,steps:[],messages:[{id:id+'-u',role:'user',content:redactKnowledge(run.goal||'Miro-Boards finden.').slice(0,240)},{id:id+'-a',role:'assistant',content:summary,provider:run.provider,model:run.model,sources,steps,failed:!!run.error||run.interrupted===true}]});
+}

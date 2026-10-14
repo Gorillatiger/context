@@ -1,0 +1,96 @@
+.nango-page { max-width: 1120px; margin: 0 auto; color: var(--coco-ink); }
+.nango-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.nango-heading h1 { font: 500 clamp(32px, 4vw, 52px)/1.08 var(--coco-font); letter-spacing: -.035em; color: var(--coco-burgundy); margin: 12px 0 16px; }
+.nango-heading p:not(.small-label) { margin: 0; max-width: 690px; color: var(--coco-muted); line-height: 1.7; }
+.nango-heading > .button { flex: 0 0 auto; margin-top: 32px; }
+.nango-overview { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 22px; border: 1px solid var(--coco-outline); border-radius: var(--coco-card-radius); background: var(--coco-white); }
+.nango-overview strong { display: block; font-size: 17px; color: var(--coco-burgundy); }
+.nango-overview span { display: block; color: var(--coco-muted); font-size: 13px; margin-top: 5px; }
+.nango-data-flow { margin: 16px 0 24px; padding: 16px 22px; border-left: 3px solid var(--coco-outline); background: var(--coco-rose); border-radius: 0 var(--coco-control-radius) var(--coco-control-radius) 0; }
+.nango-data-flow strong { color: var(--coco-burgundy); font-size: 14px; }
+.nango-data-flow p { color: var(--coco-muted); line-height: 1.7; margin: 7px 0 0; font-size: 13px; }
+.nango-service-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.nango-service { min-width: 0; padding: 24px; border: 1px solid var(--coco-outline); border-radius: var(--coco-card-radius); background: var(--coco-white); box-shadow: var(--coco-card-shadow); }
+.nango-service-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.nango-service-logo .tool-icon { width: 52px; height: 52px; border-radius: 9px; }
+.nango-service-logo .tool-icon svg { width: 36px; height: 36px; flex: 0 0 auto; }
+.nango-service-logo .brand-logo { background: var(--theme-logo-surface, var(--coco-white)); }
+.nango-service h2 { font: 500 26px/1.2 var(--coco-font); letter-spacing: -.025em; color: var(--coco-burgundy); margin: 18px 0 8px; }
+.nango-service > p { color: var(--coco-muted); font-size: 14px; line-height: 1.7; margin: 8px 0; }
+.nango-status { font-size: 12px; border: 1px solid var(--coco-outline); padding: 6px 10px; border-radius: 99px; color: var(--coco-muted); background: var(--coco-paper); text-align: center; }
+.nango-status.connected { color: var(--coco-success); background: var(--coco-success-bg); border-color: var(--theme-success-border, var(--coco-success)); }
+.nango-status.attention { color: var(--coco-warning); background: var(--coco-warning-bg); border-color: var(--theme-warning-border, var(--coco-warning)); }
+.nango-permissions { list-style: none; display: flex; flex-wrap: wrap; gap: 7px; padding: 0; margin: 15px 0 20px; }
+.nango-permissions li { background: var(--coco-paper); color: var(--coco-muted); border: 1px solid var(--coco-divider); padding: 5px 8px; border-radius: 4px; font-size: 12px; }
+.nango-service .nango-service-note { font-size: 12px; line-height: 1.6; }
+.nango-service-actions, .nango-form-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.nango-page .text-link { min-height: 40px; color: var(--coco-burgundy); overflow-wrap: anywhere; }
+.nango-page button[disabled] { opacity: .6; cursor: default; }
+.nango-existing { margin-top: 18px; border-top: 1px solid var(--coco-divider); padding-top: 10px; }
+.nango-existing summary { min-height: 40px; display: list-item; padding-block: 11px; color: var(--coco-burgundy); cursor: pointer; font-size: 13px; }
+.nango-existing p { color: var(--coco-muted); font-size: 12px; line-height: 1.7; }
+.nango-existing form { display: grid; gap: 12px; }
+.nango-existing form > button { justify-self: start; }
+.nango-page label { display: grid; gap: 7px; font-size: 13px; color: var(--coco-muted); line-height: 1.5; }
+.nango-page input:not([type="checkbox"]):not([type="radio"]) { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; background: var(--coco-white); color: var(--coco-ink); border: 1px solid var(--coco-control-outline); border-radius: var(--coco-control-radius); font: inherit; }
+.nango-page input[readonly] { background: var(--coco-paper); }
+.nango-page input[type="checkbox"], .nango-page input[type="radio"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--coco-burgundy); }
+.nango-page :is(input, button, a, summary):focus-visible { outline: 2px solid var(--coco-burgundy); outline-offset: 3px; }
+.nango-setup { margin-block: 28px; padding: 24px; border: 1px solid var(--coco-outline); background: var(--coco-paper); border-radius: var(--coco-card-radius); scroll-margin-block-start: 24px; }
+.nango-setup h2, .nango-reset h2 { color: var(--coco-burgundy); font: 500 24px/1.25 var(--coco-font); margin: 0 0 12px; }
+.nango-setup > p { max-width: 850px; color: var(--coco-muted); line-height: 1.7; font-size: 13px; }
+.nango-host-choice { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; padding: 0; margin: 22px 0; border: 0; }
+.nango-host-choice legend { margin-bottom: 10px; color: var(--coco-burgundy); font-size: 14px; }
+.nango-host-choice label { display: flex; align-items: center; min-height: 40px; cursor: pointer; }
+.nango-fields, .nango-integration-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.nango-integration-fields { margin: 22px 0 18px; }
+.nango-integration-fields fieldset { min-width: 0; display: grid; align-content: start; gap: 12px; border: 1px solid var(--coco-divider); border-radius: var(--coco-control-radius); padding: 16px; }
+.nango-integration-fields legend { font-weight: 500; color: var(--coco-burgundy); padding: 0 6px; }
+.nango-page .nango-write { display: flex; align-items: center; gap: 9px; min-height: 40px; cursor: pointer; }
+.nango-optional { font-size: 11px; color: var(--coco-caption); }
+.nango-subtle { font-size: 12px; line-height: 1.7; color: var(--coco-muted); margin: 12px 0 18px; }
+.nango-message { font-size: 13px; line-height: 1.7; color: var(--coco-burgundy); background: var(--coco-rose); border: 1px solid var(--coco-outline); border-radius: var(--coco-control-radius); padding: 13px 17px; margin: 0 0 20px; }
+.nango-message.error { color: var(--theme-error, var(--coco-burgundy)); background: var(--theme-error-bg, var(--coco-paper)); border-color: var(--theme-error-border, var(--coco-coral)); }
+.nango-message.success { color: var(--coco-success); background: var(--coco-success-bg); border-color: var(--theme-success-border, var(--coco-success)); }
+.nango-auth-pending { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; align-items: center; padding: 16px 20px; margin: 0 0 22px; border: 1px solid var(--coco-outline); background: var(--coco-rose); border-radius: var(--coco-control-radius); }
+.nango-auth-pending p { color: var(--coco-burgundy); font-size: 13px; line-height: 1.7; margin: 0; }
+.nango-auth-pending small { grid-column: 1 / -1; color: var(--coco-muted); line-height: 1.6; font-size: 12px; }
+.nango-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--coco-divider); }
+.nango-footer p { color: var(--coco-muted); font-size: 12px; line-height: 1.7; }
+.nango-reset { margin-top: 16px; padding: 20px; border: 1px solid var(--coco-outline); border-radius: var(--coco-card-radius); background: var(--coco-rose); }
+.nango-reset p { color: var(--coco-muted); font-size: 13px; line-height: 1.7; }
+@media (max-width: 720px) {
+  .nango-heading, .nango-overview, .nango-footer { flex-direction: column; align-items: flex-start; }
+  .nango-heading > .button { margin-top: 0; }
+  .nango-service-grid, .nango-fields, .nango-integration-fields, .nango-auth-pending { grid-template-columns: minmax(0, 1fr); }
+  .nango-service, .nango-setup { padding: 20px; }
+  .nango-service-head { flex-wrap: wrap; }
+}
+
+/* Connections share the same quiet surfaces and rhythm as the calendar. */
+.nango-heading h1 { font-size: clamp(32px, 3.2vw, 42px); margin: 8px 0 12px; }
+.nango-heading p:not(.small-label) { max-width: 62ch; line-height: 1.6; }
+.nango-overview { padding: 16px 20px; border-color: var(--coco-divider); border-radius: 10px; }
+.nango-overview strong { color: var(--coco-ink); font-size: 15px; font-weight: 500; }
+.nango-overview span { font-variant-numeric: tabular-nums; }
+.nango-data-flow { background: transparent; border: 0; padding: 0 2px; margin: 16px 0 24px; }
+.nango-data-flow strong { color: var(--coco-muted); font-weight: 500; }
+.nango-data-flow p { max-width: 85ch; font-size: 12px; line-height: 1.6; }
+.nango-service-grid { gap: 16px; }
+.nango-service { display: flex; flex-direction: column; padding: 20px; border-color: var(--coco-divider); border-radius: 10px; box-shadow: none; }
+.nango-service-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.nango-service-logo .tool-icon { width: 40px; height: 40px; border-radius: 8px; }
+.nango-service-logo .tool-icon svg { width: 28px; height: 28px; }
+.nango-service h2 { font-size: 21px; margin: 0; color: var(--coco-ink); }
+.nango-service > p { line-height: 1.6; margin: 16px 0 0; }
+.nango-status { flex-shrink: 0; border-radius: 5px; padding: 4px 8px; font-size: 11px; }
+.nango-status.connected { border-color: transparent; }
+.nango-permissions { gap: 6px; margin: 14px 0 20px; }
+.nango-permissions li { background: var(--coco-paper); border-color: transparent; padding: 4px 7px; font-size: 11px; }
+.nango-service-actions { margin-top: auto; padding-top: 2px; gap: 8px 12px; }
+.nango-service-actions .button { min-height: 40px; padding: 9px 13px; font-size: 12px; }
+.nango-service-actions .text-link { font-size: 11px; }
+@media (max-width: 720px) {
+  .nango-service-head { align-items: center; }
+  .nango-service-identity { flex: 1 1 190px; }
+}

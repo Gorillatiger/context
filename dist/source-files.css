@@ -1,0 +1,23 @@
+/* Provider file names stay plain text; all surfaces inherit the app theme. */
+.source-files{margin:9px 0 0;min-width:0;color:var(--muted);font-size:12px}
+.source-files>summary{display:flex;align-items:center;gap:7px;min-height:36px;width:fit-content;max-width:100%;cursor:pointer;list-style:none;border-radius:5px}
+.source-files>summary::-webkit-details-marker{display:none}
+.source-files>summary>svg{width:15px;height:15px}
+.source-files>summary:hover{color:var(--accent)}
+.source-files-count{font-variant-numeric:tabular-nums}
+.source-files-scroll{max-height:280px;max-height:min(280px,40dvh);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.source-files-list{list-style:none;padding:0;margin:3px 0 0}
+.source-files-list>li{display:flex;align-items:center;gap:10px;min-width:0;min-height:52px;padding:6px 0;border-top:1px solid var(--line)}
+.source-files-list>li>svg{flex:0 0 20px;color:var(--muted)}
+.source-files-name{flex:1;min-width:0}
+.source-files .source-files-name strong{display:block;color:var(--ink);font-size:12px;font-weight:500;line-height:1.4;overflow-wrap:anywhere}
+.source-files .source-files-name small{display:block;margin-top:2px;color:var(--muted);font-size:10px;line-height:1.4;letter-spacing:.02em}
+.source-files-read{display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--accent)}
+.source-files-read:not(:disabled):hover{background:var(--coco-rose)}
+.source-files-read:disabled{opacity:.45;cursor:default}
+.source-files :is(summary,button):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:600px){.source-files>summary{min-height:44px}.source-files-scroll{max-height:35dvh}.source-files-list>li{gap:8px}.source-files .source-files-name strong{font-size:12px}}
+@media(forced-colors:active){.source-files :is(summary,button):focus-visible{outline-color:Highlight}.source-files-read{border:1px solid ButtonText}}
+
+.source-files>summary::after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);margin:0 3px 2px 5px}
+.source-files[open]>summary::after{transform:rotate(45deg);margin-bottom:5px}

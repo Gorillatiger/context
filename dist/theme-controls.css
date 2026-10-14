@@ -1,0 +1,18 @@
+/* Theme controls share the normal navigation and form geometry. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+.theme-toggle { flex-shrink: 0; width: 40px; height: 40px; border: 1px solid var(--coco-control-outline); background: var(--coco-paper); }
+.theme-toggle:hover { background: var(--coco-rose); }
+.theme-toggle .theme-sun { display: none; }
+:root[data-theme="dark"] .theme-toggle .theme-sun { display: inline; }
+:root[data-theme="dark"] .theme-toggle .theme-moon { display: none; }
+.appearance-panel label { display: block; margin-top: 20px; }
+.appearance-panel p { color: var(--coco-muted); font-size: 13px; line-height: 1.65; }
+.appearance-panel .appearance-status { margin-top: 12px; font-size: 12px; }
+.appearance-panel select { width: 100%; max-width: 360px; }
+@media (max-width: 600px) {
+  .topbar .theme-toggle { width: 36px; height: 36px; min-width: 36px; }
+}
+@media print {
+  .theme-toggle { display: none; }
+}

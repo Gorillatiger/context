@@ -1,0 +1,9 @@
+.mail-account-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;margin:0 0 16px}
+.mail-account-picker button{border:1px solid var(--line);background:var(--surface);color:var(--text);padding:8px 12px;border-radius:8px;font-size:12px;min-height:36px}
+.mail-account-picker button.selected{border-color:var(--accent);background:var(--accent);color:var(--on-accent,#fff)}
+.mail-account-picker .mail-manage-connections{margin-left:auto;background:transparent;color:var(--accent)}
+.nango-plugin-entry{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px;margin:0 0 32px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.nango-plugin-entry h2{margin:0 0 8px;font-size:22px}.nango-plugin-entry p{margin:0;color:var(--muted);max-width:60ch}
+.calendar-nango-entry{margin:14px 0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.calendar-nango-entry p{margin:0 0 12px}
+@media(max-width:700px){.mail-account-picker{gap:6px;margin-bottom:12px}.mail-account-picker .mail-manage-connections{margin-left:0}.nango-plugin-entry{flex-direction:column;align-items:flex-start}}

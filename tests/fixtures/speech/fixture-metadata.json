@@ -1,0 +1,10 @@
+{
+  "generator": "Piper 1.4.2, de_DE-thorsten-medium, CPU offline",
+  "voice": "https://huggingface.co/rhasspy/piper-voices/tree/main/de/de_DE/thorsten/medium",
+  "texts": {
+    "short": "Hallo. Zeige mir bitte die nächsten Aufgaben und Termine im aktuellen Kurs.",
+    "long": "Ich möchte meine Woche planen. Suche bitte in den Kursen nach Aufgaben, Abgabeterminen und neuen Nachrichten. Erstelle zuerst eine übersichtliche Liste und nenne bei jeder Aufgabe die ursprüngliche Quelle. Für die Projektarbeit müssen wir den Prototyp dokumentieren, eine Präsentation vorbereiten und die Ergebnisse gemeinsam besprechen. Am Mittwoch möchte ich Material in der Werkstatt abholen. Am Donnerstag soll der erste Entwurf fertig sein. Prüfe anschließend, ob es Änderungen im Stundenplan gibt. Wenn Informationen fehlen, markiere sie als unklar. Erfinde keine Fristen und sende keine E-Mail ohne meinen Auftrag.",
+    "pause-one": "Suche bitte die nächsten Aufgaben.",
+    "pause-two": "Ordne sie dem richtigen Kurs zu und zeige die Quelle."
+  }
+}
