@@ -7,6 +7,7 @@ import { collectNotifications } from './connectors/notifications.mjs';
 import {withSnapshot} from './connectors/snapshot.mjs';
 import {createKIClient,KIError} from './connectors/ki.mjs';
 import {createMailClient,MailError} from './connectors/mail.mjs';
+import {ServiceTokenError} from './connectors/service-tokens.mjs';
 
 const root = resolve(import.meta.dirname, 'dist');
 const snapshotPath=process.env.CONTEXT_SNAPSHOT_PATH||resolve(import.meta.dirname,'../../work/private/notifications.json');
@@ -37,14 +38,16 @@ const cookieValid=(header,name,sessionToken)=>{
   return /^[0-9a-f]{64}$/.test(value)&&timingSafeEqual(Buffer.from(value),Buffer.from(sessionToken));
 };
 export function validHost(host,port) { return host===`127.0.0.1:${port}`||host===`localhost:${port}`; }
-export function createRequestHandler(portProvider, collect=async()=>withSnapshot(await collectNotifications(process.env,{mailClient:defaultMail}),snapshotPath),ki=defaultKI,mail=defaultMail,openrouter=defaultOpenRouter,{now=Date.now,spaces=null}={}) {
+export function createRequestHandler(portProvider, collect=undefined,ki=defaultKI,mail=defaultMail,openrouter=defaultOpenRouter,{now=Date.now,spaces=null,services=null}={}) {
 const sessionToken=randomBytes(32).toString('hex');
+// GitLab/Mattermost tokens saved in the app (services) take effect for the next collection.
+const collectFeed=collect||(async()=>withSnapshot(await collectNotifications({...process.env,...(services?await services.overrides():{})},{mailClient:defaultMail}),snapshotPath));
 let cachedFeed,cachedAt=0,pendingFeed,feedRevision=0;
 async function collectCurrentFeed(){
   // Reconfiguration can finish while a previous account read is pending.
   // Discard that result entirely and collect only the current account state.
   for(let attempt=0;attempt<3;attempt++){
-    const revision=feedRevision,feed=await collect();
+    const revision=feedRevision,feed=await collectFeed();
     if(revision!==feedRevision)continue;
     cachedFeed=feed;cachedAt=now();return feed;
   }
@@ -59,7 +62,7 @@ return async (req, res) => {
     if(!validHost(req.headers.host,port)){res.writeHead(403);return res.end('Host rejected');}
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     const mailActions=['connection','folders','list','message','attachment','attachment-link','flag','send'];
-    if(!['GET','HEAD'].includes(req.method)&&!(req.method==='POST'&&(['/api/ai/chat','/api/ai/connection','/api/ai/forget','/api/spaces/search','/api/spaces/read'].includes(pathname)||mailActions.some(action=>pathname==='/api/mail/'+action)))){res.writeHead(405,{Allow:'GET, HEAD'});return res.end();}
+    if(!['GET','HEAD'].includes(req.method)&&!(req.method==='POST'&&(['/api/ai/chat','/api/ai/connection','/api/ai/forget','/api/spaces/search','/api/spaces/read','/api/services/configure','/api/services/forget'].includes(pathname)||mailActions.some(action=>pathname==='/api/mail/'+action)))){res.writeHead(405,{Allow:'GET, HEAD'});return res.end();}
     if(pathname.startsWith('/api/')){
       if(!cookieValid(req.headers.cookie,cookieName,sessionToken)||req.headers['sec-fetch-site']==='cross-site'||req.headers.origin&&!['http://127.0.0.1:'+port,'http://localhost:'+port].includes(req.headers.origin))return json(res,403,{error:'session_expired',message:'Die lokale Sitzung ist nicht mehr gültig. Sichere offene Entwürfe und lade den Arbeitsbereich neu.'});
       if(pathname.startsWith('/api/spaces/')){
@@ -106,6 +109,24 @@ return async (req, res) => {
           }
           return json(res,200,result);
         }catch(error){if(!res.destroyed)return json(res,error instanceof MailError||error instanceof KIError?error.status:502,{error:error instanceof MailError||error instanceof KIError?error.code:'connection_failed',message:error instanceof MailError||error instanceof KIError?error.message:'Die Mail-Verbindung ist gerade nicht verfügbar.'});return;}
+      }
+      if(pathname.startsWith('/api/services/')){
+        // Access tokens for the read-only connectors; the token is only ever received, never returned.
+        try{
+          if(pathname==='/api/services/status'&&req.method==='GET')return json(res,200,services?{available:true,services:await services.status()}:{available:false,services:{}});
+          if(!['/api/services/configure','/api/services/forget'].includes(pathname)||req.method!=='POST'){res.writeHead(405,{Allow:'GET, POST'});return res.end();}
+          if(req.headers.origin!=='http://'+req.headers.host||req.headers['x-context-request']!=='service-token'){res.writeHead(403);return res.end('Unauthorized');}
+          if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')return json(res,415,{error:'invalid_content_type',message:'Die Anfrage benötigt application/json.'});
+          if(!services)return json(res,503,{error:'not_available',message:'Das Speichern von Zugangsdaten braucht die Context-Desktop-App.'});
+          let body;try{body=await chatBody(req,4096);}catch{throw new ServiceTokenError(400,'invalid_request','Ungültige Anfrage.');}
+          if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['service','token'].includes(key))||typeof body.service!=='string')throw new ServiceTokenError(400,'invalid_request','Ungültige Anfrage.');
+          let result;
+          if(pathname==='/api/services/configure')result=await services.configure(body.service,body.token);
+          else{if(body.token!==undefined)throw new ServiceTokenError(400,'invalid_request','Ungültige Anfrage.');result=await services.forget(body.service);}
+          cachedFeed=null;cachedAt=0;feedRevision++;
+          return json(res,200,{service:body.service,...result});
+        }catch(error){if(!res.destroyed)return error instanceof ServiceTokenError?json(res,error.status,{error:error.code,message:error.message}):json(res,500,{error:'service_failed',message:'Die Verbindung konnte nicht gespeichert werden.'});}
+        return;
       }
       if(pathname.startsWith('/api/ai/')){
         try{

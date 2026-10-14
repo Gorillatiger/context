@@ -37,6 +37,7 @@ import {validateLocalAction} from './knowledge.js';
 import {resolveAgentContext} from './agent-context.js';
 import {planCurrentBoard} from './current-board.js';
 import {createFloatingAgent} from './floating-agent.js';
+import {serviceConnectable,serviceConnectHTML,loadServiceStatus,saveServiceToken,forgetServiceToken} from './service-connect.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -298,7 +299,7 @@ function render() {
     <button class="workspace" data-view="settings"><span class="workspace-avatar">C&C</span><span>Dein Arbeitsbereich<small>TH Köln · persönlich</small></span><span class="workspace-chevron">⌄</span></button>
     <p class="nav-label">ARBEITSBEREICH</p>
     <nav aria-label="Arbeitsbereich">${renderNavigation()}</nav>
-    <div class="sidebar-bottom"><button data-view="settings" class="nav-item ${view==='settings'?'active':''}">${icon('settings')}<span>Einstellungen</span></button><div class="profile"><span class="user-avatar">${esc(state.profile.name?state.profile.name.slice(0,1).toUpperCase():'C')}</span><span>${esc(state.profile.name || 'Dein persönlicher Hub')}<small>Code & Context</small></span><span class="version">v0.18.3</span></div></div>
+    <div class="sidebar-bottom"><button data-view="settings" class="nav-item ${view==='settings'?'active':''}">${icon('settings')}<span>Einstellungen</span></button><div class="profile"><span class="user-avatar">${esc(state.profile.name?state.profile.name.slice(0,1).toUpperCase():'C')}</span><span>${esc(state.profile.name || 'Dein persönlicher Hub')}<small>Code & Context</small></span><span class="version">v0.18.4</span></div></div>
   </aside>
   <div class="page-shell"><header class="topbar"><div class="breadcrumb"><button class="mobile-menu icon-button" data-action="menu" aria-label="Navigation öffnen" title="Navigation öffnen">${icon('menu')}</button><strong>${names[view]}</strong></div><label class="course-switch"><span>KURS</span><select id="course-switch" aria-label="Kurs auswählen" ${kiView.isBusy()?'disabled':''}>${courseOptions()}</select></label><button class="search-trigger" data-action="search" aria-label="Arbeitsbereich durchsuchen" title="Arbeitsbereich durchsuchen">${icon('search',17)}<span>Suche</span><kbd>⌘ K</kbd></button><button class="theme-toggle icon-button" type="button" data-action="toggle-theme" data-theme-toggle aria-label="Darkmode aktivieren" aria-pressed="false"><span class="theme-moon" aria-hidden="true">${icon('moon',18)}</span><span class="theme-sun" aria-hidden="true">${icon('sun',18)}</span></button><button class="inbox-trigger icon-button" data-view="inbox" aria-label="Posteingang öffnen${unread?', '+unread+' neue Hinweise':''}">${icon('bell',18)}${unread?'<span class="bell-dot"></span>':''}</button><span class="local-indicator"><span class="tiny-dot ${storageAvailable?'':'warning'}"></span>${storageAvailable?'Lokal gespeichert':'Nicht gespeichert'}</span></header>
   <main id="main" tabindex="-1">${({sources:()=>sourceHub.render(),connections:()=>nangoConnections.render(),boards:()=>boardView.render(),inventory:renderInventory,today:renderToday,calendar:()=>calendarView.render(),companion:()=>companion.render(),browser:()=>browserView.render(),inbox:renderInbox,mail:()=>mailView.render(),projects:renderProjects,tasks:renderTasks,links:renderBookmarks,notes:renderNotes,ai:()=>floatingOpen?heading('DEIN KONTEXTASSISTENT','Chat im Panel','',`<button class="button secondary" data-action="context-agent">${icon('star',17)} Chat hier anzeigen</button>`):kiView.render(),imports:renderImports,plugins:renderPlugins,submissions:renderSubmissions,tools:renderTools,settings:renderSettings}[view])()}</main>
@@ -403,13 +404,34 @@ function previewNotification(n){
 function connectionHelp(source) {
   const content={
     spaces:['TH-Spaces','Die vorhandenen Kurs-Aktivitäten wurden aus deiner angemeldeten Browser-Ansicht gelesen. Ihr Datum und Kurs bleiben sichtbar.','Ein Browser-Stand ist eine lokale Momentaufnahme. Eine automatische Spaces-Synchronisierung ist noch nicht verbunden.'],
-    overview:['Deine Quellen verbinden','Der mitgelieferte lokale Server hat lesende Connectoren für Mattermost, GitLab und TH-Webmail. Die lokalen Connectoren laufen auf deinem Mac. Bei einer gehosteten Version müssen sie gesondert verbunden werden.','TH-Mail wird direkt im Mailbereich verbunden. Mattermost und GitLab werden im lokalen Start-Assistenten eingerichtet. Zugangsdaten gehören weder in Projektlinks noch in Backups.'],
-    mattermost:['Mattermost','Der Connector liest begrenzte Textvorschauen ungelesener Nachrichten pro Kanal. Original-Links und Kanalzuordnung bleiben erhalten. Er sendet nichts und verändert keine Lesestände.','Benötigt einen von dir freigegebenen Mattermost-Zugang (MATTERMOST_TOKEN). Der Teilstand prüft bis zu 20 Kanäle und liest für bis zu 10 davon je 10 Textvorschauen. Direktnachrichten, Anhänge und Medien bleiben außerhalb; fehlende Vorschauen werden als Zähler gezeigt.'],
-    gitlab:['GitLab','Der Connector liest deine offenen GitLab-To-dos, etwa Erwähnungen und Zuweisungen, von git.coco.study.','Benötigt einen autorisierten GitLab-Token mit read_api-Zugriff (GITLAB_TOKEN). Er öffnet direkt die ursprüngliche Aufgabe. Ein Haken hier schließt kein GitLab-Issue.'],
+    overview:['Deine Quellen verbinden','Der mitgelieferte lokale Server hat lesende Connectoren für Mattermost, GitLab und TH-Webmail. Die lokalen Connectoren laufen auf deinem Mac. Bei einer gehosteten Version müssen sie gesondert verbunden werden.','TH-Mail wird direkt im Mailbereich verbunden. GitLab und Mattermost trägst du bei der jeweiligen Quelle ein: Der Token wird geprüft und verschlüsselt im Schlüsselbund gespeichert; alternativ richtet sie der lokale Start-Assistent ein. Zugangsdaten gehören weder in Projektlinks noch in Backups.'],
+    mattermost:['Mattermost','Der Connector liest begrenzte Textvorschauen ungelesener Nachrichten pro Kanal. Original-Links und Kanalzuordnung bleiben erhalten. Er sendet nichts und verändert keine Lesestände.','Benötigt einen persönlichen Mattermost-Zugriffstoken. Der Teilstand prüft bis zu 20 Kanäle und liest für bis zu 10 davon je 10 Textvorschauen. Direktnachrichten, Anhänge und Medien bleiben außerhalb; fehlende Vorschauen werden als Zähler gezeigt.'],
+    gitlab:['GitLab','Der Connector liest deine offenen GitLab-To-dos, etwa Erwähnungen und Zuweisungen, von git.coco.study.','Benötigt einen GitLab-Token mit read_api-Zugriff. Er öffnet direkt die ursprüngliche Aufgabe. Ein Haken hier schließt kein GitLab-Issue.'],
     webmail:['TH-Mail','Der Mailbereich liest dein Postfach direkt über IMAP und sendet über SMTP der TH Köln. Ordner, Suche, vollständiger Text, Anhänge und Antworten sind dort verfügbar.','Verbinde das Konto unter TH-Mail mit campusID, Hochschul-Adresse und Passwort. Die Zugangsdaten bleiben im Speicher des lokalen Servers. Ungelesene Kopfzeilen erscheinen zusätzlich in den gemeinsamen Mitteilungen.']
   }[source]||[];
   const browserState=sourceStates.find(s=>s.source===source&&s.status==='snapshot');
-  openModal(modalHead(content[0]||'Verbindung')+`<div class="about-copy">${browserState?`<p><strong>Bereits lokal eingelesen:</strong> ${esc(browserState.message)} Dieser Browser-Stand wird nicht automatisch beim Anbieter aktualisiert.</p>`:''}<p>${esc(content[1])}</p><p>${esc(content[2])}</p><p class="subtle-note">Die Einrichtung erfordert deine Freigabe des jeweiligen Kontozugriffs. Ein vorhandener Browser-Login allein reicht dafür nicht aus.</p>${source==='webmail'?'<button class="button secondary" data-action="mail">TH-Mail öffnen ↗</button>':''}<button class="button primary" data-action="close">Verstanden ${icon('check',16)}</button></div>`);
+  openModal(modalHead(content[0]||'Verbindung')+`<div class="about-copy">${browserState?`<p><strong>Bereits lokal eingelesen:</strong> ${esc(browserState.message)} Dieser Browser-Stand wird nicht automatisch beim Anbieter aktualisiert.</p>`:''}<p>${esc(content[1])}</p><p>${esc(content[2])}</p><p class="subtle-note">Die Einrichtung erfordert deine Freigabe des jeweiligen Kontozugriffs. Ein vorhandener Browser-Login allein reicht dafür nicht aus.</p>${serviceConnectable(source)?`<div class="service-connect" data-service-connect="${esc(source)}"><p class="subtle-note" role="status">Verbindung wird geprüft …</p></div>`:''}${source==='webmail'?'<button class="button secondary" data-action="mail">TH-Mail öffnen ↗</button>':''}<button class="button primary" data-action="close">Verstanden ${icon('check',16)}</button></div>`);
+  if(serviceConnectable(source))void renderServiceConnect(source);
+}
+// GitLab and Mattermost tokens are entered here and kept only by the local server (encrypted by the desktop app).
+async function renderServiceConnect(service,options={}){
+  const box=modal.querySelector(`[data-service-connect="${service}"]`);if(!box)return;
+  try{box.innerHTML=serviceConnectHTML(service,await loadServiceStatus(),options);}
+  catch{box.innerHTML='<p class="error-message" role="alert">Der lokale Server ist nicht erreichbar.</p>';}
+}
+// A running read would swallow the request; the new token must be read once it is free.
+async function refreshFeedAfterServiceChange(){
+  for(let attempt=0;attempt<4;attempt++){const result=await refreshFeed(true);if(result?.accepted!==false||result.reason!=='busy')return;await new Promise(resolve=>setTimeout(resolve,1500));}
+}
+async function saveServiceForm(form){
+  const service=form.dataset.service,token=String(new FormData(form).get('token')||'');form.reset();
+  const box=modal.querySelector(`[data-service-connect="${service}"]`);if(box)box.querySelectorAll('button,input').forEach(el=>{el.disabled=true;});
+  try{await saveServiceToken(service,token);await renderServiceConnect(service,{message:'Gespeichert. Die Mitteilungen werden jetzt geprüft.'});void refreshFeedAfterServiceChange();}
+  catch(error){await renderServiceConnect(service,{message:error.message,error:true});}
+}
+async function forgetService(service){
+  try{await forgetServiceToken(service);await renderServiceConnect(service,{message:'Der Token wurde entfernt.'});void refreshFeedAfterServiceChange();}
+  catch(error){await renderServiceConnect(service,{message:error.message,error:true});}
 }
 function mailConnectionChanged(service,change){
   invalidateSearch();if(service!=='th')return;
@@ -677,6 +699,7 @@ document.addEventListener('click',e=>{
   else if(action==='inbox-filter'){inboxFilter=value;inboxLimit=50;render();}
   else if(action==='more-notifications'){inboxLimit+=50;render();}
   else if(action==='connection-help')connectionHelp(id);
+  else if(action==='service-forget'&&serviceConnectable(id))void forgetService(id);
   else if(action==='desktop-notifications')toggleDesktopNotifications();
   else if(action==='read-notification'){const n=inboxItems().find(n=>n.id===id);if(!n)return;const key=notificationKey(n);state.inboxRead=state.inboxRead.includes(key)?state.inboxRead.filter(k=>k!==key):[...state.inboxRead,key].slice(-2000);commit();}
   else if(action==='open-notification'){const n=inboxItems().find(n=>n.id===id);if(!n)return;if(n.diaryId)diaryView.open(n.diaryId,n.diaryDate);else if(n.taskId)editTask(n.taskId);else previewNotification(n);}
@@ -706,6 +729,7 @@ document.addEventListener('change',async e=>{
   }
 });
 document.addEventListener('submit',async e=>{
+  if(e.target.id==='service-token-form'&&serviceConnectable(e.target.dataset.service)){e.preventDefault();void saveServiceForm(e.target);return;}
   if(e.target.id==='workspace-search'){e.preventDefault();void searchView.open({query:new FormData(e.target).get('query')||''});return;}
   if(e.target.id==='assistant-start'){e.preventDefault();kiView.prefill(new FormData(e.target).get('prompt'));setView('ai');$('#ki-prompt')?.focus();return;}
   const f=e.target;if(!['profile-form','project-form','task-form','link-form','note-form','markdown-form','submission-form','paste-import-form','tool-form'].includes(f.id))return;
@@ -723,7 +747,9 @@ document.addEventListener('submit',async e=>{
     modal.close();toast(saved?'Gespeichert.':'Änderung nur im Arbeitsspeicher. Bitte Backup exportieren.');
   }catch(err){const el=$('.form-error',f);if(el){el.hidden=false;el.textContent=err.message;}else toast(err.message);}
 });
-modal.addEventListener('close',()=>{if(!modal.open){projectLayoutCleanup?.();projectLayoutCleanup=undefined;detachNativeSpace();document.body.classList.remove('native-project-open');$('#app').inert=false;if(modalReturnFocus?.isConnected)modalReturnFocus.focus({preventScroll:true});syncAgentContext();}});
+modal.addEventListener('close',()=>{if(!modal.open){projectLayoutCleanup?.();projectLayoutCleanup=undefined;detachNativeSpace();document.body.classList.remove('native-project-open');$('#app').inert=false;if(modalReturnFocus?.isConnected)modalReturnFocus.focus({preventScroll:true});syncAgentContext();
+  // A feed read that finished while the dialog was open could not redraw the list behind it.
+  if(view==='inbox')render();}});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&modal.open&&!searchModal.open&&nativeSpacesAvailable()){e.preventDefault();modal.close();}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'&&$('#markdown-form',modal)){e.preventDefault();$('#markdown-form',modal).requestSubmit();}

@@ -7,6 +7,7 @@ import { safeURL } from '../dist/core.js';
 const execFileAsync=promisify(execFile);
 const GITLAB='https://git.coco.study';
 const MATTERMOST='https://chat.coco.study';
+export const SERVICE_ORIGINS=Object.freeze({gitlab:GITLAB,mattermost:MATTERMOST});
 const stableAccount=value=>createHash('sha256').update(String(value)).digest('hex').slice(0,12);
 const text=(value,max=200)=>typeof value==='string'?value.slice(0,max):'';
 const id=value=>(typeof value==='string'||typeof value==='number'&&Number.isSafeInteger(value)&&value>=0)&&/^[a-zA-Z0-9_-]{1,80}$/.test(String(value))?String(value):null;

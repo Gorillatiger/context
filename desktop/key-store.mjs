@@ -2,11 +2,11 @@ import {randomUUID} from 'node:crypto';
 import * as files from 'node:fs/promises';
 import path from 'node:path';
 
-// API keys of the cloud AI providers. They are persisted only through the
+// API keys of the cloud AI providers and access tokens of the GitLab and Mattermost connectors. They are persisted only through the
 // operating system's encryption (Electron safeStorage, macOS keychain) and never
 // reach the renderer, the workspace, backups, exports or logs. Without available
 // encryption nothing is written and the key lives in memory until quit.
-const PROVIDERS=['kiconnect','openrouter'],MAX_BYTES=16384,MAX_KEY=4096;
+const PROVIDERS=['kiconnect','openrouter','gitlab','mattermost'],MAX_BYTES=16384,MAX_KEY=4096;
 const valid=value=>typeof value==='string'&&value.length>0&&value.length<=MAX_KEY&&!/[\r\n]/.test(value);
 export function createDesktopKeyStore({directory,crypto,platform=process.platform}={}){
   const target=directory?path.join(directory,'ai-keys.enc'):'';
@@ -39,7 +39,7 @@ export function createDesktopKeyStore({directory,crypto,platform=process.platfor
   return {
     /** One provider's view; load() returns '' when nothing is stored. */
     forProvider(provider){
-      if(!PROVIDERS.includes(provider))throw new TypeError('Unbekannter KI-Anbieter.');
+      if(!PROVIDERS.includes(provider))throw new TypeError('Unbekannter Anbieter.');
       return {
         load:()=>enqueue(async()=>{await restore();return keys[provider]||'';}),
         save:key=>enqueue(async()=>{if(!valid(key))return false;await restore();const previous=keys[provider];keys={...keys,[provider]:key};if(await persist())return true;if(previous===undefined){const {[provider]:_removed,...rest}=keys;keys=rest;}else keys={...keys,[provider]:previous};return false;}),

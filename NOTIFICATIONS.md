@@ -21,3 +21,14 @@ Bei Abruffehlern bleiben die letzten Hinweise der betroffenen Quelle als „Letz
 Die Backend-Korrektur benötigt einen Prozess mit dem aktuellen `server.mjs`. Ein schon laufender externer Server wird nicht beendet, weil TH-Mail-/KI-Zugangsdaten nur in dessen RAM liegen können. Renderer und clientseitige Kontowechselgrenzen funktionieren mit dem aktualisierten Quellstand; die neue Servergeneration gilt ab einem regulären Neustart. Konten danach gegebenenfalls erneut verbinden.
 
 Prüfungen: Scheduler mit Fake-Uhr, tatsächliche Server-/Mailclient-Rennen, aktueller App-Ablauf, Quellen-/Kursgrenzen und UI in Hell/Dunkel sowie schmalen Fenstern. Echte neue Providerzugriffe wurden im Testlauf nicht ausgeführt.
+
+## GitLab und Mattermost in der App verbinden
+
+Unter **Mitteilungen → Quellen & Status → GitLab bzw. Mattermost** (oder „Verbindungen einrichten“) trägst du den persönlichen Zugriffstoken ein. GitLab braucht den Zugriff `read_api`, Mattermost einen persönlichen Zugriffstoken, sofern die Plattform ihn freigibt.
+
+- **Prüfung:** Der lokale Server liest einmal genau das, was der Connector später liest (GitLab: eigene To-dos, Mattermost: eigenes Profil). Abgelehnte oder nicht erreichbare Token werden nicht gespeichert, und die Meldung sagt warum.
+- **Speicherung:** Der Token liegt verschlüsselt im macOS-Schlüsselbund (`ai-keys.enc`, wie die KI-Schlüssel) und wird beim Start wieder geladen. Ohne verfügbaren Schlüsselbund bleibt er nur bis zum Beenden im Speicher; die Oberfläche sagt das. Er erscheint nie in der Seite, ihrem Speicher, Links, Backups, Exporten oder Logs und wird nie zurückgegeben; im Feld steht nach dem Speichern nichts mehr.
+- **Vorrang:** Ein in der App gespeicherter Token gilt vor `GITLAB_TOKEN`/`MATTERMOST_TOKEN` des lokalen Servers. „Token entfernen“ löscht ihn; dann gilt wieder die Umgebungsvariable, falls vorhanden.
+- **Danach:** Die Mitteilungen werden sofort neu geprüft. TH-Mail wird weiter im Mailbereich eingerichtet, TH-Spaces über die Anmeldung im Context-Browser.
+- **Prüfen:** `npm run test:services:electron` startet die echte Oberfläche mit simulierten Anbieterantworten (falscher Token, richtiger Token, nicht erreichbar, entfernen).
+
