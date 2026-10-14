@@ -139,9 +139,23 @@ export function searchKnowledge(documents,query,limit=6){
 
 const isoStamp=value=>typeof value==='string'&&value.length<=40&&/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2}))?$/.test(value)&&Number.isFinite(Date.parse(value));
 function object(value,keys){return value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).every(k=>keys.includes(k));}
+// Models wrap the protocol object in reasoning (<think>), prose or code fences, or put raw line breaks
+// inside strings. Only one complete object with type answer/tool is taken from that, never partial text.
+function escapeRawBreaks(text){let out='',inString=false,escaped=false;for(const char of text){if(inString){if(escaped)escaped=false;else if(char==='\\')escaped=true;else if(char==='"')inString=false;else if(char==='\n'){out+='\\n';continue;}else if(char==='\r')continue;else if(char==='\t'){out+='\\t';continue;}}else if(char==='"')inString=true;out+=char;}return out;}
+function objectsIn(text){const found=[];for(let start=text.indexOf('{');start>=0&&found.length<8;start=text.indexOf('{',start+1)){let depth=0,inString=false,escaped=false;for(let at=start;at<text.length;at++){const char=text[at];if(inString){if(escaped)escaped=false;else if(char==='\\')escaped=true;else if(char==='"')inString=false;}else if(char==='"')inString=true;else if(char==='{')depth++;else if(char==='}'&&--depth===0){found.push(text.slice(start,at+1));break;}}}return found;}
+export function parseAgentJSON(content){
+  if(typeof content!=='string')return undefined;
+  const text=content.replace(/<think>[\s\S]*?<\/think>/gi,'').replace(/^[\s\S]*<\/think>/i,'').trim();
+  const fenced=[...text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)].map(match=>match[1].trim());
+  const candidates=[text,...fenced,...objectsIn(text)];
+  for(const candidate of candidates)for(const variant of [candidate,escapeRawBreaks(candidate)]){
+    try{const value=JSON.parse(variant);if(value&&typeof value==='object'&&!Array.isArray(value)&&['answer','tool'].includes(value.type))return value;}catch{}
+  }
+  return undefined;
+}
 export function validateAgentReply(content){
   if(typeof content!=='string'||content.length>50000)throw new Error('Die KI-Antwort ist ungültig.');
-  let value;try{value=JSON.parse(content.trim().replace(/^```(?:json)?\s*\n?/,'').replace(/\n?```$/,''));}catch{throw new Error('Das Modell hat keine gültige Assistenten-Antwort geliefert. Bitte erneut versuchen oder ein anderes Modell wählen.');}
+  const value=parseAgentJSON(content);if(value===undefined)throw new Error('Das Modell hat keine gültige Assistenten-Antwort geliefert. Bitte erneut versuchen oder ein anderes Modell wählen.');
   // An answer that ends with a question carries answer suggestions (checkboxes in the app); bad suggestions are dropped, not the answer.
   if(value?.type==='answer'&&object(value,['type','text','citations','options','multiple'])&&typeof value.text==='string'&&value.text.trim()&&value.text.length<=16000&&Array.isArray(value.citations)&&value.citations.length<=12&&value.citations.every(id=>typeof id==='string'&&id.length<=160)){
     const options=Array.isArray(value.options)?[...new Map(value.options.filter(o=>typeof o==='string'&&o.trim()&&o.length<=120).map(o=>[o.trim().toLowerCase(),o.trim()])).values()].slice(0,6):[];
@@ -318,9 +332,11 @@ export async function runProjectAgent({prompt,history=[],documents,workspace,get
     // Local models sometimes answer in prose instead of the JSON protocol. Free text is
     // never accepted as an answer; the model gets exactly one format correction per run.
     let reply;try{reply=validateAgentReply(result.content);}catch(error){
-      if(formatRepairs>=1||typeof result?.content!=='string'||!result.content.trim())throw error;formatRepairs++;
+      if(formatRepairs>=2||typeof result?.content!=='string'||!result.content.trim())throw error;formatRepairs++;
       const retry=await complete([...messages,{role:'assistant',content:result.content.slice(0,4000)},{role:'user',content:'FORMATFEHLER: Deine letzte Nachricht war kein gültiges JSON. Antworte jetzt ausschließlich mit genau einem JSON-Objekt: {"type":"answer","text":"…","citations":["id",…]} mit den ids gelesener Quellen, oder {"type":"tool","tool":"…","args":{…}}. Kein Text außerhalb des JSON.'}],signal);
-      checkAbort();tokens+=retry.totalTokens||0;reply=validateAgentReply(retry.content);
+      checkAbort();tokens+=retry.totalTokens||0;
+      // Still prose after the correction: show it as the answer (nothing is executed), but only after something was read.
+      try{reply=validateAgentReply(retry.content);}catch(again){const prose=[retry.content,result.content].map(v=>typeof v==='string'?v.replace(/<think>[\s\S]*?<\/think>/gi,'').trim():'').find(v=>v&&!/"type"\s*:\s*"tool"/.test(v)&&v.length<=16000);if(!prose||!steps.length)throw again;reply={type:'answer',text:prose,citations:[]};}
     }
     if(reply.type==='answer'){
       const ids=[...new Set([...reply.citations,...citationIds(reply.text)])];
