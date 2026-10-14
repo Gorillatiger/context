@@ -40,7 +40,7 @@ test('every source carries date, semester and age relative to today; undated and
   const by=title=>context.knowledge.find(doc=>doc.title===title);
   assert.deepEqual([by('Abgaberegeln SS 2020').age,by('Abgaberegeln SS 2020').sem,by('Abgaberegeln SS 2020').date],['veraltet','SS 2020','2020-04-01']);
   assert.equal(by('Abgaberegeln').age,'aktuell');assert.equal(by('Hinweis').age,'unbekannt');assert.equal(by('Hinweis').date,undefined);
-  assert.match(message,/Aktualität:/);assert.match(message,/Rückfragen: ask_user/);assert.match(message,/Bleibe effizient/);
+  assert.match(message,/Aktualität:/);assert.match(message,/Rückfragen: Lieber gezielt fragen/);assert.match(message,/Effizient bleiben/);
 });
 
 test('tool results carry the age too, so a read of an old page is labelled where the model looks',async()=>{

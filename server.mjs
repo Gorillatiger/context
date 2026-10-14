@@ -122,7 +122,7 @@ return async (req, res) => {
             if(!services)return json(res,503,{error:'not_available',message:'GitLab-Zugriff braucht die Context-Desktop-App.'});
             const info=(await services.status()).gitlab;if(!info?.configured)return json(res,409,{error:'not_connected',message:'GitLab ist noch nicht verbunden. Verbinde es unter Mitteilungen → Quellen & Status.'});
             let body;try{body=await chatBody(req,2048);}catch{return json(res,400,{error:'invalid_request',message:'Ungültige Anfrage.'});}
-            if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['op','query','projectId','path'].includes(key))||typeof body.op!=='string')return json(res,400,{error:'invalid_request',message:'Ungültige Anfrage.'});
+            if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['op','query','projectId','path','scope'].includes(key))||typeof body.op!=='string')return json(res,400,{error:'invalid_request',message:'Ungültige Anfrage.'});
             const controller=new AbortController(),cancel=()=>{if(!res.writableEnded)controller.abort();};res.once?.('close',cancel);
             try{const token=(await services.overrides()).GITLAB_TOKEN;const value=await gitlabRead(body.op,body,{fetcher:services.fetcher,token:token&&token!=='browser-session'?token:'',signal:controller.signal});if(!res.destroyed)return json(res,200,value);}
             catch(error){if(error instanceof GitlabReadError&&!res.destroyed)return json(res,error.status,{error:error.code,message:error.message});if(!res.destroyed)return json(res,502,{error:'provider_error',message:'GitLab konnte nicht gelesen werden.'});}

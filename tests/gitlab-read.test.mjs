@@ -54,3 +54,31 @@ test('the assistant finds the fork, reads the README and cites it; without a con
   let bare='';const none=await runProjectAgent({prompt:'Hallo',workspace:ws,documents:[],projectId:'c',platform:async()=>({}),getWorkspace:()=>ws,complete:async messages=>{bare=messages[0].content;return {content:JSON.stringify({type:'answer',text:'ok',citations:[]})};}});
   assert.doesNotMatch(bare,/gitlab_projects/);assert.ok(none.content);
 });
+
+test('who am I, my open tasks and search work like a read-only plugin',async()=>{
+  const {fetcher,calls}=api({'/api/v4/user':()=>reply(200,{id:3,username:'pat',name:'Pat Doe',web_url:'https://git.coco.study/pat'}),
+    '/issues?scope=assigned_to_me':()=>reply(200,[{title:'README ergänzen',state:'opened',due_date:'2026-10-17',labels:['Abgabe'],project_id:7,web_url:'https://git.coco.study/a/-/issues/1'}]),
+    '/merge_requests?scope=assigned_to_me':()=>reply(200,[]),'/todos?state=pending':()=>reply(200,[{action_name:'mentioned',target:{title:'Feedback'},project:{path_with_namespace:'a/b'},target_url:'https://git.coco.study/a/b/-/issues/2'}]),
+    '/projects/7/search?scope=blobs':()=>reply(200,[{path:'README.md',startline:3,data:'## Status\n- [ ] Prototyp',project_id:7}]),
+    '/search?scope=projects':()=>reply(200,[{id:7,path_with_namespace:'students/pat/uusa'}])});
+  const ctx={fetcher,token:'t0k3n-123456'};
+  assert.deepEqual(await gitlabRead('me',{},ctx),{username:'pat',name:'Pat Doe',url:'https://git.coco.study/pat'});
+  const tasks=await gitlabRead('tasks',{},ctx);assert.equal(tasks.issues[0].due,'2026-10-17');assert.deepEqual(tasks.issues[0].labels,['Abgabe']);assert.equal(tasks.todos[0].title,'Feedback');
+  const projectTasks=await gitlabRead('tasks',{projectId:7},ctx);assert.deepEqual(projectTasks.todos,[]);assert.ok(calls.some(call=>call.url.includes('/api/v4/projects/7/issues?scope=assigned_to_me')));
+  assert.equal((await gitlabRead('search',{query:'Status',projectId:7},ctx)).results[0].snippet,'## Status\n- [ ] Prototyp');
+  assert.equal((await gitlabRead('search',{query:'uusa'},ctx)).results[0].path,'students/pat/uusa');
+  for(const args of [{query:'x'},{query:'uusa',scope:'blobs'},{query:'uusa',projectId:7,scope:'users'}])await assert.rejects(gitlabRead('search',args,ctx),{code:'invalid_request'},JSON.stringify(args));
+  assert.ok(calls.every(call=>call.method==='GET'&&call.url.startsWith('https://git.coco.study/api/v4/')));
+  const tool=(name,args)=>JSON.stringify({type:'tool',tool:name,args});
+  for(const [name,args] of [['gitlab_me',{}],['gitlab_tasks',{}],['gitlab_tasks',{projectId:7}],['gitlab_search',{query:'README',scope:'blobs',projectId:7}]])assert.equal(validateAgentReply(tool(name,args)).tool,name);
+  for(const [name,args] of [['gitlab_me',{x:1}],['gitlab_search',{query:'a'}],['gitlab_search',{query:'abc',scope:'users'}],['gitlab_tasks',{projectId:'x'}]])assert.throws(()=>validateAgentReply(tool(name,args)),undefined,name);
+});
+
+test('an answer that ends with a question brings clickable suggestions; bad suggestions are dropped, never the answer',async()=>{
+  const ok=validateAgentReply(JSON.stringify({type:'answer',text:'Welches Repo ist deine Abgabe?',citations:[],options:['students/pat/uusa','students/pat/uusa-alt','students/pat/uusa'],multiple:false}));
+  assert.deepEqual(ok.options,['students/pat/uusa','students/pat/uusa-alt']);
+  const bad=validateAgentReply(JSON.stringify({type:'answer',text:'Fertig.',citations:[],options:['nur eine']}));assert.equal(bad.options,undefined);assert.equal(bad.text,'Fertig.');
+  const ws={projects:[],notes:[],tasks:[],calendarEvents:[],boardFindings:[],bookmarks:[],tools:[]};
+  const result=await runProjectAgent({prompt:'Prüfe meine Abgabe',workspace:ws,documents:[],complete:async()=>({content:JSON.stringify({type:'answer',text:'Ich habe zwei Forks gefunden. Welcher ist deine Abgabe?',citations:[],options:['uusa (aktuell)','uusa-alt']})})});
+  assert.deepEqual(result.clarification,{question:'Welcher ist deine Abgabe?',options:['uusa (aktuell)','uusa-alt'],multiple:false,answer:''});
+});
