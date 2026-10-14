@@ -1,7 +1,7 @@
 import {createHash,randomUUID} from 'node:crypto';
 import * as files from 'node:fs/promises';
 import path from 'node:path';
-import {renderMarkdown} from '../dist/markdown.js';
+import {renderDevDiaryPost} from '../dist/dev-diary-format.js';
 
 const ORIGIN='https://spaces.th-koeln.de',MAX_RESPONSE=2_000_000,MAX_CONTENT=100_000,MAX_JOURNAL=1_000_000,REVIEW_AGE=10*60_000;
 const MAX_CONTENT_TEXT=20000;
@@ -168,7 +168,7 @@ export function createDesktopDevDiary({providerSession,directory,fs=files,now=Da
   if(message.acknowledgeRevision!==undefined&&(!post||message.acknowledgeRevision!==post.revision))throw error('DIARY_REMOTE_CHANGED','Der bestätigte externe Stand ist nicht mehr aktuell. Prüfe den Beitrag erneut.');
   if(post&&record?.revision&&post.revision!==record.revision&&message.acknowledgeRevision!==post.revision)throw error('DIARY_REMOTE_CHANGED','Dein Beitrag wurde außerhalb von Context verändert. Sichere und prüfe diese Änderungen zuerst in Spaces.');
   if(post&&post.status!=='publish')throw error('DIARY_REMOTE_CHANGED','Der vorhandene Beitrag ist nicht veröffentlicht. Prüfe seinen Status zuerst in Spaces.');
-  const html=renderMarkdown(message.content,[])+'\n'+id.marker,desiredHash=bodyHash(message.title,html),reviewToken=randomUUID();
+  const html=renderDevDiaryPost(message.content)+'\n'+id.marker,desiredHash=bodyHash(message.title,html),reviewToken=randomUUID();
   for(const [token,review] of reviews)if(now()-review.at>REVIEW_AGE)reviews.delete(token);
   if(reviews.size>=100)throw error('DIARY_REVIEW_LIMIT','Schließe ältere Dev-Diary-Vorschauen und versuche es erneut.');
   const action=post?post.bodyHash===desiredHash?'unchanged':'update':'create';

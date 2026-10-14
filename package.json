@@ -1,6 +1,6 @@
 {
   "name": "coco-context-hub",
-  "version": "0.18.1",
+  "version": "0.18.2",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -21,7 +21,8 @@
     "test:miro:electron": "electron tests/miro-visitor-electron.cjs",
     "test:miro:assistant": "electron tests/miro-current-board-electron.cjs",
     "test:keys:electron": "electron tests/ai-key-store-electron.cjs",
-    "test:ki:clarify": "electron tests/ki-clarify-electron.cjs"
+    "test:ki:clarify": "electron tests/ki-clarify-electron.cjs",
+    "test:diary:electron": "electron tests/dev-diary-ui-electron.cjs"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",

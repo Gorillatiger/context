@@ -101,3 +101,13 @@ test('native cancellation errors clear readiness while retaining a useful failur
 test('fatal helper error during cancellation is not overwritten with an idle or ready state',async()=>{
   let release;const f=fixture({closeCapture:async()=>await new Promise(resolve=>release=resolve)});await f.controller.start();const cancelling=f.controller.cancel();await tick();f.emit({event:'error',code:'ENGINE_EXIT',message:'Der lokale Sprachdienst wurde beendet.'});release();await cancelling;assert.equal(f.controller.state.phase,'error');assert.equal(f.controller.state.modelReady,false);assert.equal(f.controller.state.error,'Der lokale Sprachdienst wurde beendet.');await f.controller.dispose();
 });
+
+test('a second composer cancels the first microphone before claiming the shared local helper',async()=>{
+ const first=fixture(),second=fixture();
+ try{
+  await first.controller.start();assert.equal(first.controller.state.phase,'recording');
+  await second.controller.start();assert.equal(second.controller.state.phase,'recording');
+  assert.equal(first.controller.isActive(),false);assert(first.calls.some(c=>c.type==='cancel'));
+  first.emit({event:'final',id:first.calls.find(c=>c.type==='start').id,text:'Old composer'});assert.equal(first.results.length,0);
+ }finally{await first.controller.dispose();await second.controller.dispose();}
+});

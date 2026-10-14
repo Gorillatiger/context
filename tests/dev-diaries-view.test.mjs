@@ -126,7 +126,7 @@ function fixture(t, options = {}) {
     }
     throw new Error("Unexpected native diary operation");
   } };
-  const view = createDevDiaryView({ getState: () => state, bridge,
+  const view = createDevDiaryView({ getState: () => state, bridge, ...(options.speechFactory?{speechFactory:options.speechFactory}:{}),
     onSave(value) {
       saveAttempts.push(structuredClone(value));
       if (options.save && options.save(value) !== true) return false;
@@ -484,4 +484,40 @@ test("a connection result for an earlier selected course cannot label the new co
  gate.resolve({ok:true,value:{supported:true}});await f.flush();
  assert.match(f.modal.innerHTML,/Designing Things/);assert.doesNotMatch(f.modal.innerHTML,/Verbunden · Kategorie/);
  assert.match(f.modal.innerHTML,/Dev Diary anlegen/);assert.equal(f.saveAttempts.length,0);
+});
+
+
+test("post settings stay as drafts, update the preview and save into the same diary without publishing",async t=>{
+ const f=fixture(t,{seed:'Ein Ergebnis'});f.open();
+ const form=f.document.getElementById('dd-appearance-form');
+ form.elements.title.value='Mein Kursjournal';form.elements.layout.value='collapsible';form.elements.order.value='newest';form.elements.headings.value='compact';form.elements.hideEmpty.checked=true;form.elements.showPeriod.checked=false;
+ f.document.dispatch('change',form.elements.layout);
+ assert(f.view.hasUnsaved());assert.equal(f.state.devDiaries[0].title.startsWith('Dev Diary'),true);assert.equal(f.calls.length,0);
+ await f.close();f.open();assert.equal(f.document.getElementById('dd-appearance-form').elements.title.value,'Mein Kursjournal');
+ f.document.dispatch('submit',f.document.getElementById('dd-appearance-form'));
+ assert.equal(f.state.devDiaries[0].title,'Mein Kursjournal');assert.equal(f.state.devDiaries[0].presentation.layout,'collapsible');assert(!f.view.hasUnsaved());
+ f.click('prepare');await f.flush();assert.match(f.calls[0].content,/<details>/);assert.match(f.calls[0].content,/### Ergebnisse/);assert.doesNotMatch(f.calls[0].content,/Noch nicht ausgefüllt/);assert.equal(f.calls.filter(c=>c.op==='publish').length,0);
+});
+
+test("diary speech inserts once into the chosen field without saving, sending or publishing; late final after day change is ignored",async t=>{
+ let config,active=false,cancelled=0;
+ const f=fixture(t,{seed:'Getippt',speechFactory:options=>{config=options;return {state:{available:true,phase:'ready',models:[],model:'small',pauseMs:1800},isActive:()=>active,start:async()=>{active=true;},stop:async()=>{active=false;},cancel:async()=>{active=false;cancelled++;},dispose:async()=>{},handleClick:()=>{},handleChange:()=>{},handleToggle:()=>{}};}});
+ f.open();f.click('dictate',{ddField:'learned'});await f.flush();
+ const contextKey=config.getContextKey();assert.equal(active,true);
+ config.onFinal({id:'one',contextKey,text:'Ich habe etwas gelernt.',autoSend:true,saveTranscript:true});
+ config.onFinal({id:'one',contextKey,text:'Ich habe etwas gelernt.'});
+ assert.equal(f.entry().elements.learned.value,'Ich habe etwas gelernt.');assert.equal(f.entry().elements.done.value,'Getippt');
+ assert.equal(f.state.devDiaries[0].entries[0].learned,'');assert.equal(f.saveAttempts.length,0);assert.equal(f.calls.length,0);
+ f.click('day',{ddDay:'2026-10-14'});
+ config.onFinal({id:'late',contextKey,text:'Falscher Tag'});
+ assert.equal(f.entry().elements.learned.value,'');assert(cancelled>0);
+ assert.doesNotMatch(f.modal.innerHTML,/Nach dem Sprechende automatisch senden|Chatarchiv speichern/);
+});
+
+test("oversized dictation stays available in full instead of being truncated or silently saved",async t=>{
+ let config;
+ const f=fixture(t,{speechFactory:options=>{config=options;return {state:{available:false,phase:'unavailable',models:[]},isActive:()=>false,start:async()=>{},cancel:async()=>{},dispose:async()=>{}};}});
+ f.open();f.click('dictate',{ddField:'done'});await f.flush();
+ const text='Deutsch '.repeat(600);config.onFinal({id:'large',contextKey:config.getContextKey(),text});
+ assert.equal(f.entry().elements.done.value,'');assert.match(f.modal.innerHTML,/Vollständiges Diktat/);assert(f.modal.innerHTML.includes(text.trim()));assert.equal(f.saveAttempts.length,0);
 });

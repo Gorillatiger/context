@@ -241,3 +241,10 @@ test('a platform source without any date is shown as undated instead of silently
  const control=f.document.querySelectorAll('[data-ki-action="source"]').find(node=>node.dataset.id===doc.id);assert(control);
  assert.match(control.textContent,/Datum unbekannt/);assert.match(control.querySelector('em').attrs.class,/\bold\b/);
 });
+
+test('chat speech listeners ignore controls belonging to the dev diary',async t=>{
+ const f=fixture(t);await f.ready();
+ f.document.mount('<div data-dd-voice><button data-speech-action="start">Diary microphone</button><input type="checkbox" data-speech-setting="autoSend"></div>');
+ f.click('[data-speech-action=start]');f.change('[data-speech-setting=autoSend]',true);await settle();
+ assert.equal(f.speechCalls.filter(c=>c.type==='start'||c.type==='load').length,0);
+});

@@ -19,3 +19,63 @@ dialog.dev-diary-modal.beside-browser{inset:20px 0 auto;margin:0 auto;max-width:
 .dd-setup .form-footer{position:sticky;bottom:-24px;z-index:2;background:var(--coco-white);padding:16px 0;margin-bottom:-8px}
 @media(min-width:900px){.dd-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}.dd-day{justify-content:space-between}}
 @media(max-width:580px){dialog.dev-diary-modal{width:calc(100vw - 20px);padding:18px;max-height:calc(100dvh - 20px)}.dev-diary-modal .modal-head{top:-18px}.dd-setup .form-footer{bottom:-18px;gap:12px;flex-wrap:wrap}}
+
+/* Diary workbench: writing leads; formatting stays inside one disclosure. */
+.dd-studio{min-width:0;color:var(--coco-ink)}
+.dd-studio button,.dd-studio input,.dd-studio select,.dd-studio textarea{font:inherit}
+.dd-studio .dd-course-strip{padding:16px 20px;background:var(--coco-paper);gap:16px}
+.dd-studio .dd-course-strip strong{font-size:20px;line-height:1.3;overflow-wrap:anywhere;text-wrap:balance}
+.dd-studio .dd-course-strip>div{gap:4px;min-width:0}
+.dd-studio .dd-course-strip>div>span:last-child{font-size:13px;font-variant-numeric:tabular-nums}
+.dd-date-bar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:20px 0 12px}
+.dd-date-bar .dd-date-picker{margin:0;font-size:14px;gap:12px}
+.dd-date-picker input{min-height:44px}
+.dd-voice-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px}
+.dd-voice-toggle svg,.dd-field-mic svg{width:20px;height:20px;flex-shrink:0}
+.dd-studio .dd-days{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:0 0 24px;padding:4px 2px 12px;scrollbar-width:thin}
+.dd-days .dd-day{white-space:nowrap;min-height:44px;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.dd-studio .dd-editor-layout{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px}
+.dd-editor-layout>*{min-width:0}
+.dd-studio #dd-entry-form legend{font-size:18px;line-height:1.4;margin-bottom:20px}
+.dd-field{margin-bottom:20px}
+.dd-field-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.dd-field-head label{display:flex;align-items:center;gap:8px;margin:0;font-size:14px;font-weight:600}
+.dd-field-number{color:var(--coco-muted);font-size:12px;font-variant-numeric:tabular-nums;font-weight:400}
+.dd-field-mic{width:44px;height:44px;min-width:44px;border:1px solid var(--coco-divider);border-radius:8px;background:var(--coco-paper);color:var(--coco-ink)}
+.dd-field-mic:hover:not(:disabled){border-color:var(--coco-outline);background:var(--coco-white)}
+.dd-studio .dd-field textarea{width:100%;min-height:104px;padding:12px 14px;font-size:15px;line-height:1.6;background:var(--coco-paper);border:1px solid var(--coco-divider);border-radius:8px;box-sizing:border-box}
+.dd-save-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-top:1px solid var(--coco-divider)}
+.dd-save-bar .dd-local-state{margin:0;font-size:13px}
+.dd-studio .dd-publish-panel{padding:20px;background:var(--coco-paper);border-color:var(--coco-divider)}
+.dd-preview-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.dd-preview-heading .tag{font-size:11px;white-space:nowrap}
+.dd-appearance{border-block:1px solid var(--coco-divider);margin-bottom:20px}
+.dd-appearance>summary,.dd-reminder-settings>summary{cursor:pointer;min-height:44px;align-content:center;font-size:14px;font-weight:600}
+.dd-appearance form{padding:8px 0 20px;display:grid;gap:16px;min-width:0}
+.dd-appearance label,.dd-reminder-settings label{margin:0;font-size:13px;min-width:0}
+.dd-appearance input,.dd-appearance select{max-width:100%;min-width:0;width:100%;box-sizing:border-box}
+.dd-format-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-width:0}
+.dd-studio .dd-check{font-size:13px;min-height:32px}
+.dd-studio .dd-check input{width:18px}
+.dd-post-preview{max-height:540px;overflow:auto;padding:16px;background:var(--coco-white);border:1px solid var(--coco-divider);border-radius:8px;font-size:14px;line-height:1.6;overflow-wrap:anywhere;scrollbar-gutter:stable}
+.dd-post-preview h1{font-size:22px;line-height:1.25;text-wrap:balance;margin-top:0}
+.dd-post-preview h2{font-size:18px}.dd-post-preview h3{font-size:15px}
+.dev-diary-day{border:1px solid var(--coco-divider);border-radius:6px;padding:0 12px;margin-block:12px;background:var(--coco-paper)}
+.dev-diary-day>summary{cursor:pointer;min-height:44px;align-content:center;font-weight:600;font-variant-numeric:tabular-nums}
+.dd-publish-actions{padding-top:16px}
+.dd-publish-actions>.button{width:100%;min-height:44px}
+.dd-publish-actions .subtle-note{font-size:12px;line-height:1.5;margin:8px 0 16px}
+.dd-studio .dd-remote-status{font-size:13px;margin:0 0 12px}
+.dd-utility-actions{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:13px}
+.dd-utility-actions button{min-height:44px}
+.dd-studio .dd-reminder-settings{margin-top:16px;padding-top:0}
+.dd-voice{padding:16px;margin-bottom:24px;border:1px solid var(--coco-divider);border-radius:10px;background:var(--coco-paper)}
+.dd-voice>label{font-size:13px;max-width:360px;margin-bottom:12px}
+.dd-voice .speech-input{border:0;margin:0;padding:0;background:transparent}
+.dd-voice .speech-toolbar{flex-wrap:wrap}
+.dd-voice .speech-status{font-size:13px}
+.dd-voice .speech-privacy{font-size:12px}
+.dd-voice .speech-setting-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.dd-voice .speech-options{display:flex;flex-wrap:wrap}
+@media(max-width:850px){.dd-studio .dd-editor-layout{grid-template-columns:minmax(0,1fr)}.dd-studio .dd-course-strip{flex-direction:row}.dd-post-preview{max-height:420px}}
+@media(max-width:580px){.dd-date-bar{align-items:flex-start;gap:12px;flex-wrap:wrap}.dd-date-bar .dd-date-picker{gap:8px;flex-wrap:wrap}.dd-studio .dd-course-strip{flex-direction:column;align-items:flex-start;padding:16px}.dd-studio .dd-publish-panel{padding:16px}.dd-format-grid,.dd-voice .speech-setting-grid{grid-template-columns:minmax(0,1fr)}.dd-studio .dd-editor-layout{gap:20px}.dd-voice .speech-mic{width:100%}.dd-studio .dd-course-strip strong{font-size:18px}.dd-post-preview{padding:12px}.dd-studio .dd-days{margin-bottom:16px}.dd-save-bar{flex-wrap:wrap}}

@@ -48,7 +48,7 @@ export function createKIView({onChange,onNote,getContext=()=>({workspace:{projec
     if(accepted.saveTranscript)void persist();if(accepted.autoSend&&!state.busy&&!state.readingPhoto)void send();
   }});
   queueMicrotask(()=>void speech.refresh());
-  document.addEventListener('toggle',event=>speech.handleToggle(event),true);
+  document.addEventListener('toggle',event=>{if(!event.target.closest?.('[data-dd-voice]'))speech.handleToggle(event);},true);
   function confirmSearchRecord(record) {
     const before=searchSavedRecords.get(record.id);
     const key=value=>value?JSON.stringify([value.title,value.scope,value.projectName,value.messages]):'';
@@ -202,10 +202,10 @@ export function createKIView({onChange,onNote,getContext=()=>({workspace:{projec
     if(event.target.id==='ki-calendar-direct'&&!state.busy&&!state.readingPhoto){state.calendarDirect=event.target.checked;changed();}
     if(event.target.id==='ki-auto-actions'&&!state.busy){state.allowActions=event.target.checked;changed();}
   });
-  document.addEventListener('click',event=>{if(state.menu&&!event.target.closest?.('[data-ki-menu]')&&!event.target.closest?.('[data-ki-menu-toggle]'))closeMenu();speech.handleClick(event);});
+  document.addEventListener('click',event=>{if(state.menu&&!event.target.closest?.('[data-ki-menu]')&&!event.target.closest?.('[data-ki-menu-toggle]'))closeMenu();if(!event.target.closest?.('[data-dd-voice]'))speech.handleClick(event);});
   document.addEventListener('focusin',event=>{if(state.menu&&!event.target.closest?.('[data-ki-menu]')&&!event.target.closest?.('[data-ki-menu-toggle]'))closeMenu();});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.menu&&document.querySelector('#ki-'+state.menu+'-panel')){event.preventDefault();event.stopImmediatePropagation();closeMenu(true);}},true);
-  document.addEventListener('change',event=>speech.handleChange(event));
+  document.addEventListener('change',event=>{if(!event.target.closest?.('[data-dd-voice]'))speech.handleChange(event);});
   // A shown hint about a missing choice goes away as soon as the person changes it.
   for(const type of ['change','input'])document.addEventListener(type,event=>{const error=event.target?.closest?.('[data-ki-clarify]')?.querySelector('.ki-clarify-error');if(error?.textContent)error.textContent='';});
   document.addEventListener('submit',event=>{if(event.target.dataset?.kiClarify){event.preventDefault();answerClarification(event.target);return;}if(event.target.id==='ki-form'){event.preventDefault();void send();}if(event.target.id==='ki-connect'){event.preventDefault();void connect(event.target);}});

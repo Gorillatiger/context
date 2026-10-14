@@ -186,8 +186,15 @@ function validateEntry(value, start, end) {
   return { date, ...Object.fromEntries(FIELDS.map((key) => [key, text(value[key], "Tagesnotiz", MAX_DIARY_FIELD, { multiline: true })])),
     completed: flag(value.completed), updatedAt: timestamp(value.updatedAt) };
 }
+export function validateDiaryPresentation(value = {}) {
+  object(value, ["layout", "order", "headings", "hideEmpty", "showPeriod"], "Beitragsgestaltung");
+  const options = { layout: value.layout ?? "sections", order: value.order ?? "oldest", headings: value.headings ?? "questions" };
+  if (!["sections", "collapsible"].includes(options.layout) || !["oldest", "newest"].includes(options.order) || !["questions", "compact"].includes(options.headings))
+    throw new Error("Ungültige Beitragsgestaltung.");
+  return { ...options, hideEmpty: flag(value.hideEmpty), showPeriod: flag(value.showPeriod, true) };
+}
 export function validateDevDiary(value, projects, { imported = false } = {}) {
-  object(value, ["id", "projectId", "courseName", "courseUrl", "title", "startDate", "endDate", "entries", "reminder", "remote", "createdAt", "updatedAt", "archived"], "Dev Diary");
+  object(value, ["id", "projectId", "courseName", "courseUrl", "title", "startDate", "endDate", "entries", "reminder", "remote", "createdAt", "updatedAt", "archived", "presentation"], "Dev Diary");
   const id = identifier(value.id), projectId = identifier(value.projectId, "Kurs-ID");
   const courseUrl = spacesURL(value.courseUrl, { course: true });
   if (projects !== undefined && !devDiaryCourses(projectsOf(projects).map((project) => ({ ...project, archived: false }))).some((c) => c.projectId === projectId && c.courseUrl === courseUrl))
@@ -202,7 +209,7 @@ export function validateDevDiary(value, projects, { imported = false } = {}) {
     throw new Error(`Ein Dev Diary unterstützt höchstens ${MAX_DIARY_TEXT} Zeichen Tagesnotizen.`);
   return { id, projectId, courseName: text(value.courseName, "Kursname", 240, { required: true }), courseUrl,
     title: text(value.title, "Diary-Titel", 240, { required: true }), startDate, endDate, entries: normalized,
-    reminder: validateReminder(value.reminder, startDate, endDate), remote: validateRemote(value.remote, courseUrl, imported),
+    presentation: validateDiaryPresentation(value.presentation), reminder: validateReminder(value.reminder, startDate, endDate), remote: validateRemote(value.remote, courseUrl, imported),
     createdAt: timestamp(value.createdAt), updatedAt: timestamp(value.updatedAt), archived: flag(value.archived) };
 }
 export function validateDevDiaries(values = [], projects, options = {}) {
@@ -224,7 +231,7 @@ export function draftDevDiary(input = {}, state, { now = new Date() } = {}) {
   return validateDevDiary({ id: input.id || "draft", ...course,
     title: input.title || `Dev Diary · ${course.courseName}`.slice(0, 240), startDate, endDate,
     entries: input.entries || Array.from({ length: count }, (_, n) => blankEntry(shiftDay(startDate, n))),
-    reminder: input.reminder, remote: input.remote, createdAt: input.createdAt || instant,
+    presentation: input.presentation, reminder: input.reminder, remote: input.remote, createdAt: input.createdAt || instant,
     updatedAt: instant, archived: input.archived }, projectsOf(state));
 }
 export function createDevDiary(input = {}, state, { id, now = new Date() } = {}) {
@@ -250,19 +257,23 @@ function markdownText(value) {
 }
 function printedDate(value) { const [year, month, date] = value.split("-"); return `${date}.${month}.${year}`; }
 export function compileDevDiaryMarkdown(value) {
-  const diary = validateDevDiary(value), count = periodDays(diary.startDate, diary.endDate);
+  const diary = validateDevDiary(value), count = periodDays(diary.startDate, diary.endDate), style = diary.presentation;
   const markdownURL = diary.courseUrl.replace(/[()]/g, (character) => character === "(" ? "%28" : "%29");
-  const lines = [`# ${markdownText(diary.title)}`, "", `Kurs: [${markdownText(diary.courseName)}](${markdownURL})`, "",
-    `Zeitraum: **${printedDate(diary.startDate)} – ${printedDate(diary.endDate)}** (${count} ${count === 1 ? "Tag" : "Tage"})`, ""];
+  const lines = [`# ${markdownText(diary.title)}`, "", `Kurs: [${markdownText(diary.courseName)}](${markdownURL})`, ""];
+  if (style.showPeriod) lines.push(`Zeitraum: **${printedDate(diary.startDate)} – ${printedDate(diary.endDate)}** (${count} ${count === 1 ? "Tag" : "Tage"})`, "");
   const entries = diary.entries.filter((entry) => entry.completed || FIELDS.some((key) => entry[key]));
+  if (style.order === "newest") entries.reverse();
   if (!entries.length) lines.push("*Für diesen Zeitraum gibt es noch keine Tagesnotizen.*", "");
-  const headings = ["Was habe ich gemacht?", "Was habe ich gelernt?", "Welche Probleme gab es?", "Was ist mein nächster Schritt?"];
+  const headings = style.headings === "compact" ? ["Ergebnisse", "Erkenntnisse", "Herausforderungen", "Nächste Schritte"] : ["Was habe ich gemacht?", "Was habe ich gelernt?", "Welche Probleme gab es?", "Was ist mein nächster Schritt?"];
   for (const entry of entries) {
-    lines.push("---", "", `## ${printedDate(entry.date)}`, "");
-    FIELDS.forEach((key, n) => lines.push(`### ${headings[n]}`, "", entry[key] ? markdownText(entry[key]) : "*Noch nicht ausgefüllt.*", ""));
+    if (style.layout === "collapsible") lines.push("<details>", `<summary>${printedDate(entry.date)}</summary>`, "");
+    else lines.push("---", "", `## ${printedDate(entry.date)}`, "");
+    FIELDS.forEach((key, n) => { if (!style.hideEmpty || entry[key]) lines.push(`### ${headings[n]}`, "", entry[key] ? markdownText(entry[key]) : "*Noch nicht ausgefüllt.*", ""); });
+    if (style.layout === "collapsible") lines.push("</details>", "");
   }
   return lines.join("\n").trimEnd() + "\n";
 }
+
 function nameKey(value) {
   return String(value || "").normalize("NFKC").toLocaleLowerCase("de-DE").replace(/\s+/g, " ").trim();
 }

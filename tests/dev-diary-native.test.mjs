@@ -209,3 +209,12 @@ test('an author can select the existing Diary category without category-manageme
  assert.equal(f.posts.length,1);assert.deepEqual(f.posts[0].categories,[28]);
  for(const call of f.calls.filter(c=>c.url.includes('/wp/v2/categories')))assert.equal(new URL(call.url).searchParams.get('context'),'view');
 });
+
+test('the native publisher preserves date-only disclosure HTML and keeps user HTML escaped',async t=>{
+ const f=await fixture(t),content='# Diary\n\n<details>\n<summary>14.10.2026</summary>\n\n### Ergebnisse\n\n&lt;script&gt;bad()&lt;/script&gt;\n\n</details>\n';
+ await firstPost(f,content);
+ assert.match(f.posts[0].content.raw,/<details class="dev-diary-day"><summary>14\.10\.2026<\/summary>/);
+ assert.match(f.posts[0].content.raw,/<h3>Ergebnisse<\/h3>/);
+ assert.doesNotMatch(f.posts[0].content.raw,/<script>/);
+ assert.equal(f.posts.length,1);
+});

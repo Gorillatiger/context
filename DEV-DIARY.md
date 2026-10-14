@@ -1,17 +1,39 @@
-# Dev Diaries · seit Context 0.15.1
+# Dev Diary
 
-## Einstieg und Ablauf
+In **Notizen → Dev Diary** einen vorhandenen Spaces-Kurs und die Kursphase wählen (Standard: 14 Tage). Der Editor verwaltet Tagesnotizen und eine gemeinsame Beitragsvorschau. Datumsleiste oder Datumsauswahl wechseln den Tag; nicht gespeicherte Tagesentwürfe bleiben während dieser Sitzung erhalten.
 
-Im Bereich **Notizen** steht **Dev Diary starten** direkt über dem Notizbuch. Auch der normale Markdown-Notizdialog hat die Schaltfläche **Dev Diary mit Vorlage**. Vorhandene Notizentwürfe bleiben im Arbeitsspeicher erhalten.
+## Schreiben und diktieren
 
-1. Einen vorhandenen Kurs mit einem echten Spaces-Projektlink auswählen. Fehlt er, unter **Projekte → Verbindungen** einen Kurs-Space hinzufügen.
-2. Beginn und Dauer festlegen: Standard **14 Kalendertage**. Eindeutig zugeordnete lokale Kalendertermine liefern einen separaten Vorschlag, der ausdrücklich übernommen oder geändert werden kann. Eine laufende Phase kann aus einem kürzlich vergangenen und einem folgenden Kurstermin innerhalb dieses Zeitraums vorgeschlagen werden. Es gibt keine automatische Laufzeitfestlegung und keine KI-Übermittlung des Kalenders.
-3. Auf Wunsch die Spaces-Verbindung bereits vor dem Anlegen lesend prüfen. Es wird kein Beitrag angelegt.
-4. Die tägliche Erinnerung einstellen: Standard **18:00 Uhr, Europe/Berlin**, einschließlich Wochenende; optional nur Montag bis Freitag. Dev Diary lokal anlegen.
-5. Für jeden Tag **gemacht, gelernt, Probleme und nächster Schritt** notieren. Ein abgeschlossenes Tagesdatum unterdrückt dessen Erinnerung. Tageswechsel und Schließen erhalten ungesicherte Entwürfe in dieser App-Sitzung. **Tagesnotizen speichern** übernimmt alle offenen Tagesentwürfe dieses Diaries dauerhaft in den lokalen Arbeitsbereich.
-6. **Für Spaces prüfen** speichert zunächst die Entwürfe, prüft Anmeldung/Kurs/Kategorie und zeigt den vollständigen Beitrag. Erst **Diesen Beitrag veröffentlichen** überträgt ihn. Anschließend heißt die Aktion **Aktualisierung prüfen** und aktualisiert denselben eigenen Beitrag.
+Das Mikrofon neben einer Frage diktiert direkt in dieses Feld. Alternativ **Diktieren** öffnen und das Zielfeld wählen. Die vorhandene lokale whisper.cpp-/Silero-Erkennung verarbeitet Deutsch; Modellwahl, Downloadfortschritt, Pausendauer und CPU-Fallback stehen unter den Spracheinstellungen. Ein Modell muss einmal heruntergeladen werden; danach funktioniert die Erkennung offline. Die Spracheingabe braucht die Desktop-App und eine Mikrofonberechtigung. Details zu Einrichtung und Plattformgrenzen stehen in `SPEECH.md`.
 
-Für denselben Kurs und exakt denselben Zeitraum verhindert die Oberfläche ein zweites Diary. Mehrere unterschiedliche Kursphasen haben getrennte Diaries. Pro Diary-Laufzeit bleibt es ein Spaces-Beitrag. Der Markdown-Export enthält auch noch ungesicherte Tagesentwürfe, ohne sie zu veröffentlichen.
+Diktate werden an vorhandenen Text angehängt, bleiben bearbeitbar und werden erst mit **Speichern** dauerhaft in den Diary-Daten gesichert. Es gibt keinen automatischen Versand, keinen KI-Aufruf und keinen Eintrag im Chatarchiv. Audio wird verworfen. Beim Tagwechsel, Schließen oder Wechsel zum Chatmikrofon wird die Aufnahme abgebrochen. Zu lange Diktate bleiben vollständig zum manuellen Kopieren sichtbar; das Feldlimit beträgt 4.000 Zeichen.
+
+## Beitrag gestalten
+
+Die ausklappbaren Einstellungen steuern:
+
+- Titel des Beitrags
+- offene Tagesabschnitte oder aufklappbare Tage
+- ältester oder neuester Tag zuerst
+- Vorlagenfragen oder kurze Überschriften
+- leere Felder ausblenden
+- Kurszeitraum im Beitrag anzeigen
+
+Die Vorschau enthält auch ungespeicherte Entwürfe. **Speichern** übernimmt Text und Gestaltung lokal. Alte Diaries erhalten die bisherige offene Darstellung als Standard; Gestaltung wird auch im Arbeitsbereich-Backup mitgenommen.
+
+## Spaces
+
+**Für Spaces prüfen** speichert zuerst den lokalen Stand und bereitet eine unveränderliche Veröffentlichungsvorschau vor. Erst der anschließende Veröffentlichungsbutton schreibt. Pro Diary/Kursphase bleibt es derselbe Beitrag in der Kategorie `DevDiary`; weitere Tage aktualisieren ihn. Änderungen an Text oder Gestaltung verwerfen eine vorherige Freigabe. Externe Änderungen am Beitrag müssen weiterhin abgeglichen werden.
+
+Markdown-Export, Vorschau und nativer Publisher verwenden dieselbe Gestaltung. Der Diary-Renderer erlaubt ausschließlich feste `details`-Tags mit einem Datum als `summary`; Inhalte bleiben HTML-escaped. Die allgemeine Markdown-Darstellung akzeptiert weiterhin kein HTML. Eine WordPress-Installation kann `details` zusätzlich filtern oder anders gestalten; die tatsächliche Darstellung auf einem produktiven Kurs-Space wurde für diese Änderung nicht durch einen Testpost überprüft.
+
+## Prüfungen
+
+`npm run check` prüft Datenmigration, Gestaltung, Entwurfs-/Speicherverhalten, einmalige Diktatübernahme, Kontextwechsel, Konfliktschutz und den nativen Publikationspfad mit synthetischen Antworten. Optional: `npm run test:diary:electron` für den echten Chromium-Editor mit isoliertem Profil und synthetischem Sprachtransport. Die Ausgabe behauptet keine echte Mikrofonaufnahme oder Veröffentlichung.
+
+## Bestehender technischer Ablauf und Grenzen
+
+Die folgenden Details gelten weiterhin. In 0.18.2 ergänzt ausschließlich die oben beschriebene feste Disclosure-Syntax den bisherigen Text-Renderer.
 
 ## Veröffentlichung und Wiederholung
 

@@ -347,3 +347,25 @@ test("an explicit ongoing multi-day calendar block takes precedence over inferre
   assert.equal(proposed.days, 14);
   assert.deepEqual(proposed.eventIds, ["explicit-phase"]);
 });
+
+test('legacy diaries receive safe presentation defaults, and backup imports retain styling',()=>{
+ const diary=makeDiary();delete diary.presentation;
+ assert.deepEqual(validateDevDiary(diary).presentation,{layout:'sections',order:'oldest',headings:'questions',hideEmpty:false,showPeriod:true});
+ const style={layout:'collapsible',order:'newest',headings:'compact',hideEmpty:true,showPeriod:false};
+ assert.deepEqual(validateDevDiary({...diary,presentation:style},undefined,{imported:true}).presentation,style);
+ for(const presentation of [null,[],{layout:'<script>'},{order:'random'},{headings:'html'},{hideEmpty:'yes'},{showPeriod:1},{injected:true}])assert.throws(()=>validateDevDiary({...diary,presentation}));
+});
+
+test('presentation compiles the same daily entries with ordered disclosures and no empty-field placeholders',()=>{
+ let diary=makeDiary({days:3,presentation:{layout:'collapsible',order:'newest',headings:'compact',hideEmpty:true,showPeriod:false}});
+ diary=updateDailyEntry(diary,'2026-10-13',{done:'Erster Tag <script>alert(1)</script>'});
+ diary=updateDailyEntry(diary,'2026-10-14',{learned:'Neue Erkenntnis'});
+ const md=compileDevDiaryMarkdown(diary);
+ assert(md.indexOf('14.10.2026')<md.indexOf('13.10.2026'));
+ assert.equal((md.match(/<details>/g)||[]).length,2);
+ assert.equal((md.match(/<\/details>/g)||[]).length,2);
+ assert.match(md,/### Ergebnisse/);assert.match(md,/### Erkenntnisse/);
+ assert.doesNotMatch(md,/Zeitraum:|Noch nicht ausgefüllt|### Herausforderungen|<script>/);
+ assert.match(md,/&lt;script&gt;/);
+ assert.equal(validateDevDiary(diary).entries[0].done,'Erster Tag <script>alert(1)</script>');
+});
