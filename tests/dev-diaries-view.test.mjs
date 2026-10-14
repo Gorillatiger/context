@@ -126,7 +126,7 @@ function fixture(t, options = {}) {
     }
     throw new Error("Unexpected native diary operation");
   } };
-  const view = createDevDiaryView({ getState: () => state, bridge, ...(options.speechFactory?{speechFactory:options.speechFactory}:{}),
+  const view = createDevDiaryView({ getState: () => state, bridge, autosaveDelay:options.autosaveDelay??false, ...(options.speechFactory?{speechFactory:options.speechFactory}:{}),
     onSave(value) {
       saveAttempts.push(structuredClone(value));
       if (options.save && options.save(value) !== true) return false;
@@ -142,7 +142,7 @@ function fixture(t, options = {}) {
       else { if (modal.open) modal.close(); modal.innerHTML = html; modal.showModal(); }
     },
   });
-  t.after(async () => { for (const cleanup of cleanups) await cleanup(); await tick(); globalThis.document = previousDocument; });
+  t.after(async () => { view.dispose();for (const cleanup of cleanups) await cleanup(); await tick(); globalThis.document = previousDocument; });
   const click = (action, data = {}) => {
     const button = { dataset: { ddAction: action, ...data }, closest(selector) { return selector === "[data-dd-action]" ? button : null; } };
     document.dispatch("click", button);
@@ -520,4 +520,37 @@ test("oversized dictation stays available in full instead of being truncated or 
  f.open();f.click('dictate',{ddField:'done'});await f.flush();
  const text='Deutsch '.repeat(600);config.onFinal({id:'large',contextKey:config.getContextKey(),text});
  assert.equal(f.entry().elements.done.value,'');assert.match(f.modal.innerHTML,/Vollständiges Diktat/);assert(f.modal.innerHTML.includes(text.trim()));assert.equal(f.saveAttempts.length,0);
+});
+
+
+test('the daily editor has one direct Spaces action and keeps layout and reflection controls optional',t=>{
+ const f=fixture(t);f.open();
+ assert.match(f.modal.innerHTML,/data-dd-action="sync"/);assert.doesNotMatch(f.modal.innerHTML,/data-dd-action="prepare"|data-dd-action="publish"|Gestaltung speichern|Tagesnotizen speichern/);
+ assert.match(f.modal.innerHTML,/<details class="dd-reflections">/);assert.match(f.modal.innerHTML,/<details class="dd-simple-options"/);assert.doesNotMatch(f.modal.innerHTML,/dd-publish-panel/);
+});
+
+test('one click locally saves and publishes once without a second review; remote binding survives dismissal',async t=>{
+ const pending=deferred(),f=fixture(t,{seed:'Ein Klick',bridge:request=>{assert.equal(request.op,'sync');return pending.promise;}});
+ f.cleanup(async()=>{if(!pending.settled)pending.resolve(published);await tick();});
+ f.open();f.click('sync');f.click('sync');assert.equal(f.calls.length,1);assert.equal(f.calls[0].op,'sync');
+ await f.close();pending.resolve(published);await f.flush();
+ assert.equal(f.state.devDiaries[0].remote.postId,'123');assert.equal(f.modal.open,false);
+});
+
+test('typing auto-saves locally without any network write',async t=>{
+ const f=fixture(t,{autosaveDelay:1});f.open();f.input('done','Automatisch lokal');
+ await new Promise(resolve=>setTimeout(resolve,15));
+ assert.equal(f.state.devDiaries[0].entries[0].done,'Automatisch lokal');assert.equal(f.calls.length,0);assert.equal(f.view.hasUnsaved(),false);
+});
+
+test('GIF selection and captions are local until one explicit sync, which includes the attachment token',async t=>{
+ const bytes=new Uint8Array(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64')),id=createHash('sha256').update(bytes).digest('hex');
+ const f=fixture(t,{bridge:request=>{
+  if(request.op==='stage-media')return {ok:true,value:{id,name:'Mein GIF.gif',mime:'image/gif',size:bytes.length,caption:''}};
+  if(request.op==='sync')return published;
+  throw new Error('No upload expected');
+ }});f.open();
+ const input=f.document.getElementById('dd-media-input');input.files=[{name:'Mein GIF.gif',size:bytes.length,arrayBuffer:async()=>bytes.buffer}];f.document.dispatch('change',input);await f.flush();
+ assert.deepEqual(f.calls.map(c=>c.op),['stage-media']);assert.match(f.modal.innerHTML,/dd-media-card/);assert.equal(f.state.devDiaries[0].entries[0].attachments,undefined);
+ f.click('sync');await f.flush();assert.equal(f.calls[1].op,'sync');assert.match(f.calls[1].content,new RegExp('diary-media:'+id));assert.equal(f.state.devDiaries[0].remote.postId,'123');
 });

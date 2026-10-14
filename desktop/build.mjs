@@ -26,7 +26,7 @@ execFileSync('/usr/bin/codesign',['--force','--sign','-',ocrHelper],{stdio:'inhe
 }
 const apps=await packager({dir:root,out,name:'Context Browser',platform:targetPlatform,arch:process.arch,electronVersion:'44.7.0',appVersion:version,extendInfo:{NSMicrophoneUsageDescription:'Context verarbeitet deine Sprache ausschließlich lokal auf diesem Gerät. Audio wird nicht gespeichert.'},appBundleId:'dev.hazylabs.context',asar:{unpack:'**/{*.py,ocr-helper,document-helper,document-worker.mjs,speech-helper,speech-helper.exe,*.dylib,*.dll,*.so}'},overwrite:true,prune:true,ignore:[ /^\/node_modules\b/,/^\/mac\b/,/^\/tests\b/,/^\/\.git(?:\/|$)/,/^\/\.openai(?:\/|$)/,/^\/.env/,/^\/.*\.zip$/,/^\/.*(?:-qa|-benchmark)[^/]*$/,/^\/(?:VALIDIERUNG\.md|search-cache-benchmark\.json|search-pagination-benchmark\.json|speech-extra-cases\.json)$/,/^\/[^/]*\.(?:png|jpe?g|log)$/],download:{cacheRoot:path.resolve(root,'../../work/electron-cache')}});
 if(targetPlatform!=='darwin'){console.log('Built '+apps[0]);process.exit(0);}
-const destination='/private/tmp/context-browser-runtime/Context Browser.app';
+const destination=process.env.CONTEXT_DESKTOP_RUNTIME_APP?path.resolve(process.env.CONTEXT_DESKTOP_RUNTIME_APP):'/private/tmp/context-browser-runtime/Context Browser.app';
 await mkdir(path.dirname(destination),{recursive:true});
 try{await stat(destination);await rename(destination,path.join(out,'previous-'+Date.now()+'.app'));}catch(error){if(error.code!=='ENOENT')throw error;}
 await cp(path.join(apps[0],'Context Browser.app'),destination,{recursive:true,verbatimSymlinks:true});

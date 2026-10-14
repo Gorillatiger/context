@@ -173,7 +173,7 @@ return async (req, res) => {
     const file = resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
     if (!file.startsWith(root + sep)) { res.writeHead(403); return res.end(); }
     const body = await readFile(file);
-    res.writeHead(200, { 'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', ...(pathname==='/'||pathname==='/index.html'?{'Set-Cookie':`${cookieName}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200`,'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"}:{}) });
+    res.writeHead(200, { 'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', ...(pathname==='/'||pathname==='/index.html'?{'Set-Cookie':`${cookieName}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200`,'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"}:{}) });
     res.end(body);
   } catch { res.writeHead(404); res.end('Nicht gefunden'); }
 };

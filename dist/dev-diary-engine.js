@@ -1,5 +1,6 @@
 // Local data and deterministic proposals only. Remote status is display data;
 // native publication requires its own reviewed request and authoritative ledger.
+import {validateDiaryAttachment,DIARY_MEDIA_PER_DAY,DIARY_MEDIA_PER_RUN} from './dev-diary-media.js';
 import { validateCalendarEvent } from "./calendar-engine.js";
 
 export const DEV_DIARY_TIME_ZONE = "Europe/Berlin";
@@ -180,10 +181,13 @@ function validateRemote(value, courseUrl, imported) {
     status: imported && (postId || url || lastPublishedHash || status !== "draft") ? "unknown" : status };
 }
 function validateEntry(value, start, end) {
-  object(value, ["date", ...FIELDS, "completed", "updatedAt"], "Diary-Tagesnotiz");
+  object(value, ["date", ...FIELDS, "completed", "updatedAt", "attachments"], "Diary-Tagesnotiz");
   const date = day(value.date);
   if (date < start || date > end) throw new Error("Die Tagesnotiz liegt außerhalb der Diary-Laufzeit.");
-  return { date, ...Object.fromEntries(FIELDS.map((key) => [key, text(value[key], "Tagesnotiz", MAX_DIARY_FIELD, { multiline: true })])),
+  const attachments=value.attachments===undefined?[]:value.attachments;
+  if(!Array.isArray(attachments)||attachments.length>DIARY_MEDIA_PER_DAY)throw new Error('Höchstens acht Bilder pro Tag.');
+  const media=attachments.map(validateDiaryAttachment);if(new Set(media.map(m=>m.id)).size!==media.length)throw new Error('Dasselbe Bild ist an diesem Tag bereits vorhanden.');
+  return { date, ...(media.length?{attachments:media}:{}), ...Object.fromEntries(FIELDS.map((key) => [key, text(value[key], "Tagesnotiz", MAX_DIARY_FIELD, { multiline: true })])),
     completed: flag(value.completed), updatedAt: timestamp(value.updatedAt) };
 }
 export function validateDiaryPresentation(value = {}) {
@@ -204,6 +208,7 @@ export function validateDevDiary(value, projects, { imported = false } = {}) {
   const entries = value.entries === undefined ? [] : value.entries;
   if (!Array.isArray(entries) || entries.length > count) throw new Error("Zu viele Diary-Tagesnotizen.");
   const normalized = entries.map((entry) => validateEntry(entry, startDate, endDate)).sort((a, b) => a.date.localeCompare(b.date));
+  if(normalized.reduce((n,e)=>n+(e.attachments?.length||0),0)>DIARY_MEDIA_PER_RUN)throw new Error('Höchstens 40 Bilder pro Dev Diary.');
   if (new Set(normalized.map((entry) => entry.date)).size !== normalized.length) throw new Error("Doppeltes Diary-Tagesdatum.");
   if (normalized.reduce((sum, entry) => sum + FIELDS.reduce((n, key) => n + entry[key].length, 0), 0) > MAX_DIARY_TEXT)
     throw new Error(`Ein Dev Diary unterstützt höchstens ${MAX_DIARY_TEXT} Zeichen Tagesnotizen.`);
@@ -242,7 +247,7 @@ export function createDevDiary(input = {}, state, { id, now = new Date() } = {})
 export function updateDailyEntry(value, date, patch, { now = new Date() } = {}) {
   const diary = validateDevDiary(value);
   date = day(date);
-  object(patch, [...FIELDS, "completed"], "Änderung der Tagesnotiz");
+  object(patch, [...FIELDS, "completed", "attachments"], "Änderung der Tagesnotiz");
   const previous = diary.entries.find((entry) => entry.date === date) || blankEntry(date);
   const entry = validateEntry({ ...previous, ...patch, updatedAt: nowDate(now).toISOString() }, diary.startDate, diary.endDate);
   return validateDevDiary({ ...diary, entries: [...diary.entries.filter((item) => item.date !== date), entry],
@@ -261,7 +266,7 @@ export function compileDevDiaryMarkdown(value) {
   const markdownURL = diary.courseUrl.replace(/[()]/g, (character) => character === "(" ? "%28" : "%29");
   const lines = [`# ${markdownText(diary.title)}`, "", `Kurs: [${markdownText(diary.courseName)}](${markdownURL})`, ""];
   if (style.showPeriod) lines.push(`Zeitraum: **${printedDate(diary.startDate)} – ${printedDate(diary.endDate)}** (${count} ${count === 1 ? "Tag" : "Tage"})`, "");
-  const entries = diary.entries.filter((entry) => entry.completed || FIELDS.some((key) => entry[key]));
+  const entries = diary.entries.filter((entry) => entry.completed || FIELDS.some((key) => entry[key]) || entry.attachments?.length);
   if (style.order === "newest") entries.reverse();
   if (!entries.length) lines.push("*Für diesen Zeitraum gibt es noch keine Tagesnotizen.*", "");
   const headings = style.headings === "compact" ? ["Ergebnisse", "Erkenntnisse", "Herausforderungen", "Nächste Schritte"] : ["Was habe ich gemacht?", "Was habe ich gelernt?", "Welche Probleme gab es?", "Was ist mein nächster Schritt?"];
@@ -269,6 +274,7 @@ export function compileDevDiaryMarkdown(value) {
     if (style.layout === "collapsible") lines.push("<details>", `<summary>${printedDate(entry.date)}</summary>`, "");
     else lines.push("---", "", `## ${printedDate(entry.date)}`, "");
     FIELDS.forEach((key, n) => { if (!style.hideEmpty || entry[key]) lines.push(`### ${headings[n]}`, "", entry[key] ? markdownText(entry[key]) : "*Noch nicht ausgefüllt.*", ""); });
+    for(const image of entry.attachments||[])lines.push(`![${markdownText(image.caption||image.name)}](diary-media:${image.id})`, "");
     if (style.layout === "collapsible") lines.push("</details>", "");
   }
   return lines.join("\n").trimEnd() + "\n";

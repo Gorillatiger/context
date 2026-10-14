@@ -79,3 +79,50 @@ dialog.dev-diary-modal.beside-browser{inset:20px 0 auto;margin:0 auto;max-width:
 .dd-voice .speech-options{display:flex;flex-wrap:wrap}
 @media(max-width:850px){.dd-studio .dd-editor-layout{grid-template-columns:minmax(0,1fr)}.dd-studio .dd-course-strip{flex-direction:row}.dd-post-preview{max-height:420px}}
 @media(max-width:580px){.dd-date-bar{align-items:flex-start;gap:12px;flex-wrap:wrap}.dd-date-bar .dd-date-picker{gap:8px;flex-wrap:wrap}.dd-studio .dd-course-strip{flex-direction:column;align-items:flex-start;padding:16px}.dd-studio .dd-publish-panel{padding:16px}.dd-format-grid,.dd-voice .speech-setting-grid{grid-template-columns:minmax(0,1fr)}.dd-studio .dd-editor-layout{gap:20px}.dd-voice .speech-mic{width:100%}.dd-studio .dd-course-strip strong{font-size:18px}.dd-post-preview{padding:12px}.dd-studio .dd-days{margin-bottom:16px}.dd-save-bar{flex-wrap:wrap}}
+
+/* Daily flow: one writing surface and one Spaces action. */
+.dd-simple{max-width:780px;margin-inline:auto}
+.dd-simple-heading{display:grid;gap:4px;padding-bottom:20px;border-bottom:1px solid var(--coco-divider)}
+.dd-simple-heading strong{font-size:22px;line-height:1.35;overflow-wrap:anywhere;text-wrap:balance}
+.dd-simple-heading>span:last-child{font-size:13px;color:var(--coco-muted);font-variant-numeric:tabular-nums}
+.dd-simple-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 20px}
+.dd-date-navigation{display:flex;align-items:center;gap:4px;min-width:0}
+.dd-date-navigation .icon-button{width:40px;height:44px;border-radius:6px}
+.dd-date-navigation input{min-height:44px;width:auto;max-width:180px;min-width:0;padding:8px 10px;font-size:14px}
+.dd-simple-toolbar>.text-link{font-size:13px;white-space:nowrap;min-height:44px}
+.dd-simple .dd-field-head label{font-size:15px}
+.dd-simple .dd-field textarea{min-height:220px;background:var(--coco-paper);border-color:var(--coco-divider);font-size:16px;line-height:1.65;padding:16px}
+.dd-simple .dd-reflections .dd-field textarea{min-height:95px;font-size:15px}
+.dd-reflections{border-block:1px solid var(--coco-divider);margin:20px 0 12px}
+.dd-reflections>summary,.dd-simple-options>summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px;font-weight:500}
+.dd-reflections>summary span{margin-left:6px;font-size:12px;font-weight:400;color:var(--coco-muted)}
+.dd-reflections[open]>summary{margin-bottom:12px}
+.dd-simple-options{border-top:1px solid var(--coco-divider);margin-top:16px}
+.dd-simple-options form{display:grid;gap:16px;margin:12px 0 24px;min-width:0}
+.dd-simple-options label{font-size:13px;margin:0;min-width:0}
+.dd-simple-options select,.dd-simple-options input{min-width:0;max-width:100%;box-sizing:border-box}
+.dd-simple-options #dd-reminder-form{border-top:1px solid var(--coco-divider);padding-top:20px}
+.dd-simple .dd-sync-footer{position:sticky;bottom:-24px;background:var(--coco-white);padding:16px 0 12px;margin-top:24px;border-top:1px solid var(--coco-divider);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;z-index:1}
+.dd-sync-footer>div{display:grid;gap:4px;min-width:0}
+.dd-sync-footer .dd-local-state{margin:0;font-size:12px;overflow-wrap:anywhere}
+.dd-sync-footer a{font-size:12px;color:var(--coco-burgundy);text-underline-offset:3px}
+.dd-sync-footer>.button{min-height:44px;white-space:nowrap}
+.dd-sync-footer small{grid-column:1/-1;font-size:11px;color:var(--coco-muted);line-height:1.5}
+.dd-whole-preview{padding:20px;background:var(--coco-paper);border:1px solid var(--coco-divider);border-radius:8px;overflow-wrap:anywhere}
+.dd-whole-preview h1{font-size:24px}.dd-whole-preview h2{font-size:20px}.dd-whole-preview h3{font-size:16px}
+.dd-media{margin-top:12px}
+.dd-add-media{display:inline-flex;align-items:center;gap:8px;font-size:13px;min-height:44px}
+.dd-add-media svg{width:18px;height:18px}
+.dd-media-hint{font-size:11px;color:var(--coco-muted);margin-left:12px;display:inline-block}
+.dd-media-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.dd-media-grid:empty{display:none}
+.dd-media-card{position:relative;min-width:0;margin:0;border:1px solid var(--coco-divider);border-radius:8px;overflow:hidden;background:var(--coco-paper)}
+.dd-media-card>img{display:block;width:100%;height:130px;object-fit:contain;background:var(--coco-white)}
+.dd-media-card>input{border:0;border-top:1px solid var(--coco-divider);border-radius:0;width:100%;font-size:12px;padding:8px;min-height:40px;box-sizing:border-box}
+.dd-remove-media{position:absolute;top:4px;right:4px;background:var(--coco-white);border:1px solid var(--coco-divider);border-radius:6px;width:32px;height:32px;font-size:22px}
+.dd-media-loading{height:130px;display:grid;place-content:center;font-size:12px;padding:12px;box-sizing:border-box;overflow-wrap:anywhere}
+.dd-post-image{margin:20px 0}.dd-post-image>img{display:block;max-width:100%;height:auto;max-height:600px;object-fit:contain;border-radius:6px}.dd-post-image figcaption{font-size:12px;color:var(--coco-muted);margin-top:6px}
+@media(min-width:900px){dialog.dev-diary-modal:has(.dd-simple){width:min(900px,calc(100vw - 40px))}}
+@media(max-width:580px){.dd-simple-heading strong{font-size:18px}.dd-simple-toolbar{flex-wrap:wrap;gap:4px}.dd-simple .dd-field textarea{min-height:190px;font-size:16px;padding:12px}.dd-simple .dd-sync-footer{bottom:-18px;grid-template-columns:minmax(0,1fr)}.dd-sync-footer>.button{width:100%}.dd-media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dd-media-hint{display:block;margin:8px 0 0}.dd-whole-preview{padding:14px}}
+.dd-setup.dd-simple .dd-setup-grid{grid-template-columns:minmax(0,1fr);margin:12px 0 20px;gap:20px}.dd-setup.dd-simple .dd-reminders{border:0;padding:16px 0}.dd-setup.dd-simple .dd-calendar-proposal{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;font-size:13px}.dd-setup.dd-simple .dd-simple-options>label{font-size:13px;display:block;margin-top:12px}
+.dd-simple #dd-entry-form fieldset{border:0;padding:0;margin:0;min-width:0}.dd-simple #dd-entry-form>.dd-check{display:none}

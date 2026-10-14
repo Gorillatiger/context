@@ -2,7 +2,7 @@ import {app,BrowserWindow,WebContentsView,session,ipcMain,Menu,dialog,shell,safe
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {HUB,browserURL,requestURL,hubURL,displayURL,frameBounds} from './policy.mjs';
+import {HUB,browserURL,requestURL,hubURL,displayURL,frameBounds,workspaceImagePolicy} from './policy.mjs';
 import {safeSpacesURL} from '../dist/agent-browser.js';
 import {readScript,crawlerURL} from './reader.mjs';
 import {readerPlatformLinks} from './platform-link-policy.mjs';
@@ -178,6 +178,7 @@ win=new BrowserWindow({width:1440,height:940,minWidth:850,minHeight:600,title:'C
 win.on('page-title-updated',event=>event.preventDefault());
 win.webContents.on('will-prevent-unload',event=>{const choice=dialog.showMessageBoxSync(win,{type:'warning',buttons:['Geöffnet lassen','Trotzdem schließen'],defaultId:0,cancelId:0,message:'Im Arbeitsbereich gibt es noch ungesicherte Änderungen.',detail:'Prüfe den Chat-Speicherstatus sowie offene Notiz- und Mailentwürfe. Speichere oder sichere sie vor dem Neuladen. Trotzdem schließen kann ungesicherte Änderungen verlieren.'});if(choice===1)event.preventDefault();});
 const hubSession=win.webContents.session;hubSession.on('will-download',(_e,item)=>item.setSaveDialogOptions({title:'Lokale Datei speichern',defaultPath:path.basename(item.getFilename())}));
+hubSession.webRequest.onHeadersReceived((details,callback)=>callback({responseHeaders:workspaceImagePolicy(details)}));
 hubSession.setPermissionRequestHandler((wc,permission,callback,details)=>callback(speechPermission({webContents:wc,expected:win?.webContents,permission,origin:URL.canParse(details.requestingUrl)?new URL(details.requestingUrl).origin:'',mediaTypes:details.mediaTypes,mainFrame:details.isMainFrame===true})));
 hubSession.setPermissionCheckHandler((wc,permission,origin,details)=>speechPermission({webContents:wc,expected:win?.webContents,permission,origin,mediaTypes:[details.mediaType],mainFrame:details.isMainFrame!==false}));
 win.webContents.on('will-navigate',(e,url)=>{if(!hubURL(url))e.preventDefault();});win.webContents.on('will-redirect',(e,url)=>{if(!hubURL(url))e.preventDefault();});win.webContents.on('will-attach-webview',e=>e.preventDefault());

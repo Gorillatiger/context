@@ -10,18 +10,19 @@ const courseURL='https://spaces.th-koeln.de/course-w26/',runId='run-2026-10',non
 const entry={op:'prepare',courseURL,runId,title:'Dev Diary · Kurs',content:'# Dev Diary\n\n## 13.10.2026\nHeute habe ich gelernt.'};
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const cloned=value=>JSON.parse(JSON.stringify(value));
-async function fixture(t,{fs=files}={}){
- const directory=await files.mkdtemp(path.join(os.tmpdir(),'context-dev-diary-')),calls=[],posts=[];
+async function fixture(t,{fs=files,media=false}={}){
+ const directory=await files.mkdtemp(path.join(os.tmpdir(),'context-dev-diary-')),calls=[],posts=[],images=[];
  let time=Date.parse('2026-10-13T10:00:00Z'),nextId=100;
  const index={routes:{
   '/wp/v2/posts':{methods:['GET','POST'],schema:{properties:{meta:{properties:{scoped_notify_notify_others:{type:'string',enum:['yes','no']}}}}}},
   '/wp/v2/posts/(?P<id>[\\d]+)':{methods:['GET','POST']},
   '/wp/v2/categories':{methods:['GET']},'/wp/v2/users/me':{methods:['GET']}
  }};
- const server={index,user:{id:7,capabilities:{edit_posts:true,publish_posts:true}},categories:[{id:28,name:'DevDiary'}],pageRoot:courseURL+'wp-json/',apiLink:courseURL+'wp-json/',login:false,beforeWrite:null,afterWrite:null,totalPages:1};
+ if(media)index.routes['/wp/v2/media']={methods:['GET','POST']};
+ const server={index,user:{id:7,capabilities:{edit_posts:true,publish_posts:true,...(media?{upload_files:true}:{})}},categories:[{id:28,name:'DevDiary'}],pageRoot:courseURL+'wp-json/',apiLink:courseURL+'wp-json/',login:false,beforeWrite:null,afterWrite:null,totalPages:1};
  const response=(value,status=200,headers={})=>new Response(typeof value==='string'?value:JSON.stringify(value),{status,headers});
  const providerSession={async fetch(address,options){
-  const url=new URL(address),method=options.method,body=options.body?JSON.parse(options.body):null;
+  const url=new URL(address),method=options.method,body=options.body instanceof Uint8Array?options.body:options.body?JSON.parse(options.body):null;
   calls.push({url:url.href,method,body,headers:options.headers});assert.equal(options.redirect,'manual');assert.equal(options.credentials,'include');
   assert.equal(url.origin,'https://spaces.th-koeln.de');assert(url.pathname.startsWith('/course-w26/'));
   if(url.href===courseURL){
@@ -34,6 +35,11 @@ async function fixture(t,{fs=files}={}){
   if(route==='/')return response(server.index);
   if(route==='/wp/v2/users/me')return response(server.user);
   if(route==='/wp/v2/categories'){if(url.searchParams.get('context')==='edit'&&server.user.capabilities.manage_categories!==true)return response({code:'rest_forbidden_context'},403);return response(server.categories);}
+  if(route==='/wp/v2/media'){
+   if(method==='GET')return response(images.filter(image=>image.author===Number(url.searchParams.get('author'))&&image.slug===url.searchParams.get('slug')));
+   assert.equal(method,'POST');assert(body instanceof Uint8Array);await server.beforeMedia?.();
+   const image={id:++nextId,type:'attachment',author:server.user.id,slug:url.searchParams.get('slug'),mime_type:options.headers['Content-Type'],source_url:'https://spaces.th-koeln.de/wp-content/uploads/'+url.searchParams.get('slug')+'.gif'};images.push(image);await server.afterMedia?.(image);return response(image,201);
+  }
   if(route.startsWith('/wp/v2/posts')){
    const postId=Number(route.split('/')[4]||0);
    if(method==='GET'){
@@ -54,7 +60,7 @@ async function fixture(t,{fs=files}={}){
  const create=()=>createDesktopDevDiary({providerSession,directory,fs,now:()=>time});
  const publisher=create();t.after(async()=>{await publisher.dispose();await files.rm(directory,{recursive:true,force:true});});
  const writes=()=>calls.filter(call=>call.method==='POST');
- return {publisher,create,server,calls,posts,directory,writes,advance:value=>time+=value};
+ return {publisher,create,server,calls,posts,images,directory,writes,advance:value=>time+=value};
 }
 async function firstPost(f,content=entry.content){const prepared=await f.publisher.handle({...entry,content});return {prepared,result:await f.publisher.handle({op:'publish',reviewToken:prepared.reviewToken})};}
 
@@ -217,4 +223,62 @@ test('the native publisher preserves date-only disclosure HTML and keeps user HT
  assert.match(f.posts[0].content.raw,/<h3>Ergebnisse<\/h3>/);
  assert.doesNotMatch(f.posts[0].content.raw,/<script>/);
  assert.equal(f.posts.length,1);
+});
+
+
+const gif=()=>new Uint8Array(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64'));
+async function stageGIF(f){return f.publisher.handle({op:'stage-media',courseURL,runId,name:'Mein GIF.gif',bytes:gif()});}
+const imageContent=id=>'# Diary\n\n![Mein GIF](diary-media:'+id+')\n';
+
+test('one sync request performs preflight and updates the same post; double requests never create duplicates',async t=>{
+ const f=await fixture(t),request={...entry,op:'sync'};
+ const [a,b]=await Promise.all([f.publisher.handle(request),f.publisher.handle(request)]);
+ assert.equal(a.postId,b.postId);assert.equal(f.posts.length,1);assert.equal(f.writes().length,1);
+ await f.publisher.handle({...request,content:request.content+'\nNeu'});assert.equal(f.posts.length,1);assert.equal(f.writes().length,2);
+});
+
+test('choosing a GIF stages a private verified local file without any network call; other runs cannot read it',async t=>{
+ const f=await fixture(t,{media:true}),image=await stageGIF(f);
+ assert.equal(image.mime,'image/gif');assert.equal(image.size,gif().length);assert.equal(f.calls.length,0);
+ const read=await f.publisher.handle({op:'read-media',courseURL,runId,id:image.id});assert.deepEqual(read.bytes,gif());
+ await assert.rejects(f.publisher.handle({op:'read-media',courseURL,runId:'other-run',id:image.id}),{code:'DIARY_MEDIA_MISSING'});
+ const directory=path.join(f.directory,'media'),names=await files.readdir(directory),file=names.find(n=>n.endsWith('.image'));
+ assert.equal((await files.stat(path.join(directory,file))).mode&0o777,0o600);
+ const changed=gif();changed[30]^=1;await files.writeFile(path.join(directory,file),changed);
+ await assert.rejects(f.publisher.handle({op:'read-media',courseURL,runId,id:image.id}),{code:'DIARY_MEDIA_STORAGE'});
+});
+
+test('photos upload once to the verified course media API and are reused after restart and later diary updates',async t=>{
+ const f=await fixture(t,{media:true}),image=await stageGIF(f),request={...entry,op:'sync',content:imageContent(image.id)};
+ await f.publisher.handle(request);assert.equal(f.images.length,1);assert.equal(f.posts.length,1);assert.match(f.posts[0].content.raw,/<img src="https:\/\/spaces.th-koeln.de\/wp-content\/uploads\//);assert.doesNotMatch(f.posts[0].content.raw,/diary-media:/);
+ const upload=f.calls.find(c=>c.url.includes('/media?')&&c.method==='POST');assert.match(upload.headers['Content-Disposition'],/^attachment; filename="context-diary-image-[a-f0-9]+\.gif"$/);
+ const second=f.create();t.after(()=>second.dispose());await second.handle({...request,content:request.content+'\nNächster Tag'});
+ assert.equal(f.images.length,1);assert.equal(f.posts.length,1);
+});
+
+test('a lost upload reply is recovered by its author-bound slug before any retry or post creation',async t=>{
+ const f=await fixture(t,{media:true}),image=await stageGIF(f);f.server.afterMedia=()=>{throw new Error('Lost media reply');};
+ const request={...entry,op:'sync',content:imageContent(image.id)};
+ await assert.rejects(f.publisher.handle(request),{code:'DIARY_MEDIA_OUTCOME_UNKNOWN'});assert.equal(f.images.length,1);assert.equal(f.posts.length,0);
+ f.server.afterMedia=null;await f.publisher.handle(request);assert.equal(f.images.length,1);assert.equal(f.posts.length,1);
+});
+
+test('an unresolved upload is not blindly repeated when no remote attachment can be confirmed',async t=>{
+ const f=await fixture(t,{media:true}),image=await stageGIF(f);f.server.beforeMedia=()=>{throw new Error('Disconnected');};
+ const request={...entry,op:'sync',content:imageContent(image.id)};
+ await assert.rejects(f.publisher.handle(request),{code:'DIARY_MEDIA_OUTCOME_UNKNOWN'});await assert.rejects(f.publisher.handle(request),{code:'DIARY_MEDIA_OUTCOME_UNKNOWN'});
+ assert.equal(f.writes().length,1);assert.equal(f.posts.length,0);
+});
+
+test('missing upload capability, a foreign media URL or wrong author never authorizes a diary image',async t=>{
+ const f=await fixture(t,{media:true}),image=await stageGIF(f),request={...entry,op:'sync',content:imageContent(image.id)};
+ f.server.user.capabilities.upload_files=false;await assert.rejects(f.publisher.handle(request),{code:'DIARY_MEDIA_PERMISSION'});assert.equal(f.writes().length,0);
+ f.server.user.capabilities.upload_files=true;f.server.afterMedia=image=>{image.source_url='https://evil.test/tracker.gif';};
+ await assert.rejects(f.publisher.handle(request),{code:'DIARY_MEDIA_OUTCOME_UNKNOWN'});assert.equal(f.posts.length,0);
+ f.server.afterMedia=null;f.images[0].author=999;await assert.rejects(f.publisher.handle(request),{code:'DIARY_MEDIA_OUTCOME_UNKNOWN'});assert.equal(f.posts.length,0);
+});
+
+test('external post conflicts are detected before newly selected images are uploaded',async t=>{
+ const f=await fixture(t,{media:true});await f.publisher.handle({...entry,op:'sync'});const image=await stageGIF(f);f.posts[0].content.raw+='\n<p>Extern</p>';
+ await assert.rejects(f.publisher.handle({...entry,op:'sync',content:imageContent(image.id)}),{code:'DIARY_REMOTE_CHANGED'});assert.equal(f.images.length,0);assert.equal(f.posts.length,1);
 });

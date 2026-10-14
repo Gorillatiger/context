@@ -10,3 +10,13 @@ export function requestURL(value){try{const u=new URL(value);if(['data:','blob:'
 export function hubURL(value){try{return new URL(value).origin===HUB;}catch{return false;}}
 export function displayURL(value){try{const u=new URL(browserURL(value));u.search='';u.hash='';return u.href;}catch{return '';}}
 export function frameBounds(message,width,height){if(message?.visible!==true)return null;const r=message.rect,c=message.clip||{x:0,y:0,width,height};if(!r||![r.x,r.y,r.width,r.height,c.x,c.y,c.width,c.height].every(Number.isFinite))return null;const x=Math.ceil(Math.max(0,r.x,c.x)),y=Math.ceil(Math.max(0,r.y,c.y)),right=Math.floor(Math.min(width,r.x+r.width,c.x+c.width)),bottom=Math.floor(Math.min(height,r.y+r.height,c.y+c.height));return right>x&&bottom>y?{x,y,width:right-x,height:bottom-y}:null;}
+
+export function workspaceImagePolicy(details){
+ const headers={...details.responseHeaders};
+ if(!hubURL(details.url)||!['mainFrame','subFrame'].includes(details.resourceType))return headers;
+ for(const name of Object.keys(headers))if(name.toLowerCase()==='content-security-policy'){
+  const change=value=>typeof value==='string'?value.replace(/img-src 'self' data:(?: blob:)?;/g,"img-src 'self' data: blob:;"):value;
+  headers[name]=Array.isArray(headers[name])?headers[name].map(change):change(headers[name]);
+ }
+ return headers;
+}

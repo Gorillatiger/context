@@ -1,6 +1,8 @@
 import {createHash,randomUUID} from 'node:crypto';
 import * as files from 'node:fs/promises';
 import path from 'node:path';
+import {createDiaryMedia} from './dev-diary-media.mjs';
+import {diaryImageBytes} from '../dist/dev-diary-media.js';
 import {renderDevDiaryPost} from '../dist/dev-diary-format.js';
 
 const ORIGIN='https://spaces.th-koeln.de',MAX_RESPONSE=2_000_000,MAX_CONTENT=100_000,MAX_JOURNAL=1_000_000,REVIEW_AGE=10*60_000;
@@ -45,7 +47,8 @@ function verifiedRoutes(index){
  if(!routes||typeof routes!=='object'||![collection,item,categories,me].every(route=>methods(routes[route]).has('GET'))||![collection,item].every(route=>methods(routes[route]).has('POST')))throw error('UNVERIFIED_SPACES_API','Die erforderlichen WordPress-Beitragsfunktionen wurden von diesem Kurs nicht bestätigt.');
  const meta=routes[collection].schema?.properties?.meta?.properties?.scoped_notify_notify_others||(routes[collection].endpoints||[]).filter(endpoint=>methods({methods:endpoint.methods}).has('POST')).map(endpoint=>endpoint.args?.meta?.properties?.scoped_notify_notify_others).find(Boolean);
  const notifyDisabled=meta?.type==='string'&&meta.readonly!==true&&(!Array.isArray(meta.enum)||meta.enum.includes('no'));
- return {collection,item,categories,me,notifyDisabled};
+ const media=methods(routes['/wp/v2/media']).has('GET')&&methods(routes['/wp/v2/media']).has('POST')?'/wp/v2/media':null;
+ return {collection,item,categories,me,notifyDisabled,media};
 }
 function identity(courseURL,runId,authorId){const key=digest(JSON.stringify([courseURL,runId,authorId]));return {key,slug:'context-dev-diary-'+key.slice(0,32),marker:'<!-- context-dev-diary:'+key+' -->'};}
 function bodyHash(title,content){return digest(JSON.stringify([title,content]));}
@@ -68,13 +71,15 @@ export function readableDiaryContent(html){
 function publicPost(post){return post?{id:post.id,url:post.link,title:post.title.raw,status:post.status,modified:post.modified_gmt,revision:post.revision,...readableDiaryContent(post.content.raw)}:null;}
 function publicationResult(review,post,extra={}){return {status:'published',post:publicPost(post),postId:post.id,postURL:post.link,contentHash:digest(review.content),notifications:review.notifyDisabled?'disabled':'site-default',...extra};}
 function diaryRequest(value){
- const allowed={get:['op','courseURL','runId'],prepare:['op','courseURL','runId','title','content','acknowledgeRevision'],publish:['op','reviewToken']};
+ const allowed={get:['op','courseURL','runId'],prepare:['op','courseURL','runId','title','content','acknowledgeRevision'],publish:['op','reviewToken'],sync:['op','courseURL','runId','title','content','acknowledgeRevision'],'stage-media':['op','courseURL','runId','name','bytes'],'read-media':['op','courseURL','runId','id']};
  if(!value||typeof value!=='object'||Array.isArray(value)||!Object.hasOwn(allowed,value.op)||Object.keys(value).some(key=>!allowed[value.op].includes(key)))throw error('BAD_DIARY_REQUEST','Ungültiger Dev-Diary-Auftrag.');
  if(value.op==='publish'){if(typeof value.reviewToken!=='string'||!/^[a-f0-9-]{36}$/i.test(value.reviewToken))throw error('BAD_DIARY_REQUEST','Ungültige Freigabe des Dev Diary.');return value;}
  const clean={...value,courseURL:diaryCourseURL(value.courseURL),runId:runID(value.runId)};
- if(value.op==='prepare'&&(typeof value.title!=='string'||!value.title.trim()||value.title.length>200||/[\x00-\x1f\x7f<>]/.test(value.title)||typeof value.content!=='string'||!value.content.trim()||value.content.length>MAX_CONTENT||value.content.includes('\0')))throw error('BAD_DIARY_CONTENT','Prüfe Titel und Inhalt deines Dev Diary.');
+ if(['prepare','sync'].includes(value.op)&&(typeof value.title!=='string'||!value.title.trim()||value.title.length>200||/[\x00-\x1f\x7f<>]/.test(value.title)||typeof value.content!=='string'||!value.content.trim()||value.content.length>MAX_CONTENT||value.content.includes('\0')))throw error('BAD_DIARY_CONTENT','Prüfe Titel und Inhalt deines Dev Diary.');
  if(value.acknowledgeRevision!==undefined&&(typeof value.acknowledgeRevision!=='string'||!/^[a-f0-9]{64}$/.test(value.acknowledgeRevision)))throw error('BAD_DIARY_ACKNOWLEDGEMENT','Prüfe den externen Beitragsstand erneut.');
- if(value.op==='prepare')clean.title=value.title.trim();return clean;
+ if(['prepare','sync'].includes(value.op))clean.title=value.title.trim();
+ if(value.op==='stage-media'){if(typeof value.name!=='string'||value.name.length>240)throw error('BAD_DIARY_MEDIA','Ungültiger Bildname.');diaryImageBytes(value.bytes);}
+ if(value.op==='read-media'&&(typeof value.id!=='string'||!/^[a-f0-9]{64}$/.test(value.id)))throw error('BAD_DIARY_MEDIA','Ungültiger Bildanhang.');return clean;
 }
 function parseJournal(text){
  if(typeof text!=='string'||Buffer.byteLength(text)>MAX_JOURNAL)throw error('DIARY_JOURNAL_INVALID','Die lokale Beitragszuordnung kann nicht sicher gelesen werden.');
@@ -90,7 +95,7 @@ function parseJournal(text){
 // A narrow publisher, never a write tool of the generic AI/browser reader.
 // main.mjs must bind handle to its trusted workspace main frame.
 export function createDesktopDevDiary({providerSession,directory,fs=files,now=Date.now}){
- const target=path.join(directory,'dev-diary-publisher.json'),reviews=new Map();
+ const target=path.join(directory,'dev-diary-publisher.json'),reviews=new Map(),mediaStore=createDiaryMedia({directory,fs});
  let records={},initialization,queue=Promise.resolve(),disposed=false;
  function initialize(){if(initialization)return initialization;initialization=(async()=>{try{const stat=await fs.lstat(target);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>MAX_JOURNAL)throw new Error();records=parseJournal(await fs.readFile(target,'utf8'));}catch(cause){if(cause.code!=='ENOENT')throw error('DIARY_JOURNAL_INVALID','Die lokale Beitragszuordnung kann nicht sicher gelesen werden. Veröffentlichen ist angehalten.');}})();return initialization;}
  async function save(key,record){
@@ -100,9 +105,9 @@ export function createDesktopDevDiary({providerSession,directory,fs=files,now=Da
   catch{throw error('DIARY_JOURNAL_UNAVAILABLE','Die lokale Beitragszuordnung konnte nicht gesichert werden.');}
   finally{await fs.unlink(temporary).catch(()=>{});}
  }
- async function fetchText(url,{nonce,method='GET',body}={}){
+ async function fetchText(url,{nonce,method='GET',body,rawBody,contentType,filename}={}){
   const parsed=new URL(url);if(parsed.origin!==ORIGIN||parsed.username||parsed.password||parsed.hash)throw error('BAD_DIARY_SCOPE','Die Anfrage gehört nicht zu Spaces.');
-  let response;try{response=await providerSession.fetch(url,{method,credentials:'include',redirect:'manual',signal:AbortSignal.timeout(15000),headers:{Accept:body?'application/json':'application/json, text/html',...(nonce?{'X-WP-Nonce':nonce}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});}
+  let response;try{response=await providerSession.fetch(url,{method,credentials:'include',redirect:'manual',signal:AbortSignal.timeout(rawBody?60000:15000),headers:{Accept:body||rawBody?'application/json':'application/json, text/html',...(nonce?{'X-WP-Nonce':nonce}:{}),...(body?{'Content-Type':'application/json'}:{}),...(rawBody?{'Content-Type':contentType,'Content-Disposition':'attachment; filename="'+filename+'"'}:{})},...(body?{body:JSON.stringify(body)}:rawBody?{body:rawBody}:{})});}
   catch{throw error('DIARY_NETWORK_ERROR','Spaces konnte nicht sicher erreicht werden.');}
   // Electron's response.url may be incorrect. Never follow redirects, especially
   // when a nonce is present, and never disclose a server error body through IPC.
@@ -127,7 +132,7 @@ export function createDesktopDevDiary({providerSession,directory,fs=files,now=Da
   const me=(await api(privateContext,privateContext.routes.me,{context:'edit',_fields:'id,capabilities'})).value;
   if(!positive(me?.id))throw error('LOGIN_REQUIRED','Melde dich im Context-Browser bei Spaces an.');
   if(me.capabilities?.edit_posts!==true||me.capabilities?.publish_posts!==true)throw error('DIARY_PERMISSION_REQUIRED','Du darfst in diesem Kurs keine eigenen Beiträge veröffentlichen.');
-  privateContext.authorId=me.id;
+  privateContext.authorId=me.id;privateContext.canUpload=me.capabilities?.upload_files===true;
   const categories=(await api(privateContext,privateContext.routes.categories,{search:'DevDiary',per_page:100,context:'view',_fields:'id,name'})).value;
   if(!Array.isArray(categories))throw error('UNVERIFIED_SPACES_API','Die DevDiary-Kategorie wurde nicht bestätigt.');
   const matched=categories.filter(term=>positive(term?.id)&&typeof term.name==='string'&&term.name.replace(/[\s-]/g,'').toLowerCase()==='devdiary');
@@ -161,14 +166,15 @@ export function createDesktopDevDiary({providerSession,directory,fs=files,now=Da
   try{const value=await inspect(message);return {supported:true,loginRequired:false,courseURL:message.courseURL,runId:message.runId,category:{id:value.ctx.categoryId,name:'DevDiary'},post:publicPost(value.post),postId:value.post?.id||'',postURL:value.post?.link||'',contentHash:value.record?.contentHash||'',status:value.record?.pending?'unknown':value.post?'published':'unpublished',remoteChanged:!!value.post&&!!value.record?.revision&&value.post.revision!==value.record.revision,concurrency:'preflight'};}
   catch(cause){if(['LOGIN_REQUIRED','UNVERIFIED_SPACES_API','DIARY_PERMISSION_REQUIRED','DIARY_CATEGORY_REQUIRED'].includes(cause.code))return {supported:false,loginRequired:cause.code==='LOGIN_REQUIRED',courseURL:message.courseURL,runId:message.runId,code:cause.code,reason:cause.message};throw cause;}
  }
- async function prepare(message){
+ async function prepare(message,{allowUpload=false}={}){
   const {ctx,id,record,post}=await inspect(message);
   if(record?.pending)throw error('DIARY_OUTCOME_UNKNOWN','Der letzte Veröffentlichungsversuch ist noch unklar. Es wird kein zweiter Beitrag erstellt; prüfe den Stand in Spaces.');
   if(record?.postId&&!post)throw error('DIARY_POST_MISSING','Der bereits angelegte Beitrag wurde nicht gefunden. Es wird kein neuer Beitrag erstellt.');
   if(message.acknowledgeRevision!==undefined&&(!post||message.acknowledgeRevision!==post.revision))throw error('DIARY_REMOTE_CHANGED','Der bestätigte externe Stand ist nicht mehr aktuell. Prüfe den Beitrag erneut.');
   if(post&&record?.revision&&post.revision!==record.revision&&message.acknowledgeRevision!==post.revision)throw error('DIARY_REMOTE_CHANGED','Dein Beitrag wurde außerhalb von Context verändert. Sichere und prüfe diese Änderungen zuerst in Spaces.');
   if(post&&post.status!=='publish')throw error('DIARY_REMOTE_CHANGED','Der vorhandene Beitrag ist nicht veröffentlicht. Prüfe seinen Status zuerst in Spaces.');
-  const html=renderDevDiaryPost(message.content)+'\n'+id.marker,desiredHash=bodyHash(message.title,html),reviewToken=randomUUID();
+  const media=await mediaStore.resolve(message,ctx,api,{allowUpload});
+  const html=renderDevDiaryPost(message.content,{media})+'\n'+id.marker,desiredHash=bodyHash(message.title,html),reviewToken=randomUUID();
   for(const [token,review] of reviews)if(now()-review.at>REVIEW_AGE)reviews.delete(token);
   if(reviews.size>=100)throw error('DIARY_REVIEW_LIMIT','Schließe ältere Dev-Diary-Vorschauen und versuche es erneut.');
   const action=post?post.bodyHash===desiredHash?'unchanged':'update':'create';
@@ -205,7 +211,7 @@ export function createDesktopDevDiary({providerSession,directory,fs=files,now=Da
  }
  async function handle(value){
   if(disposed)throw error('DIARY_PUBLISHER_CLOSED','Der Dev-Diary-Publisher wird geschlossen.');
-  const message=diaryRequest(value),pending=queue.then(async()=>{await initialize();return message.op==='get'?get(message):message.op==='prepare'?prepare(message):publish(message);});queue=pending.catch(()=>{});return pending;
+  const message=diaryRequest(value),pending=queue.then(async()=>{await initialize();if(message.op==='stage-media')return mediaStore.stage(message.courseURL,message.runId,message.name,message.bytes);if(message.op==='read-media')return mediaStore.read(message.courseURL,message.runId,message.id);if(message.op==='sync'){const prepared=await prepare(message,{allowUpload:true});const result=await publish({reviewToken:prepared.reviewToken});return {...result,warning:prepared.warning};}return message.op==='get'?get(message):message.op==='prepare'?prepare(message):publish(message);});queue=pending.catch(()=>{});return pending;
  }
  return Object.freeze({handle,initialize,flush:()=>queue,dispose:async()=>{disposed=true;await queue;reviews.clear();}});
 }
