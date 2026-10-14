@@ -1,34 +1,73 @@
 # Miro-Inhalte für Suche und Assistent
 
-Die Miro-Anbindung liest echte Board-Inhalte über die offizielle REST-API. Das bisherige Board-Verzeichnis bleibt die Zuordnung zwischen Kursen und gefundenen Links. Ein gefundener Link allein gilt weiterhin nicht als gelesenes Board.
+Context liest Miro-Boards auf zwei Wegen und kennzeichnet jedes Ergebnis mit seinem Weg (`coverage.basis`):
 
-## Verbinden
+| Weg | Voraussetzung | `coverage.basis` |
+| --- | --- | --- |
+| **Miro-API** | Eigene Nango-Verbindung mit `boards:read`, Board im verbundenen Team | `rest-api-text` |
+| **Besucherzugriff** | Öffentlicher Board-Link („Jeder mit dem Link kann ansehen“), kein Miro-Konto nötig | `visitor-overview` |
 
-In Nango muss eine Integration mit dem Anbieter **miro** und dem OAuth-Scope **boards:read** eingerichtet sein. Anschließend wird das Miro-Konto in Context verbunden. Miro kann die Zustimmung eines Team-Administrators verlangen; öffentlich sichtbare oder geteilte Board-Links bedeuten nicht automatisch, dass eine OAuth-App darauf zugreifen darf. Eine fehlende Berechtigung wird angezeigt und nicht umgangen.
+Ist die API verbunden und kann sie das Board lesen, wird sie verwendet. Andernfalls (keine Verbindung, Board in einem fremden Team, fehlende Berechtigung) liest Context das Board als Besucher. Ein solcher Wechsel steht ausdrücklich in den Warnungen der Quelle. Abbrüche, Kurs- und Kontowechsel werden nie durch den Besucherweg überdeckt.
 
-Die Anbindung verwendet die vorhandene Nango-Installation des Projekts. OAuth und Token-Erneuerung übernimmt Nango. Ein Nango-Zugriffsschlüssel bleibt im nativen Prozess beziehungsweise dessen vorhandenem verschlüsselten Einstellungsbestand. Er wird weder an den Chatbot noch an eingebettete Webseiten weitergegeben. Die Integration benötigt keinen separat konfigurierten MCP-Server. Ein Miro-Connector in Codex und die Context-App besitzen getrennte Verbindungen.
+Das Board-Verzeichnis bleibt die Zuordnung zwischen Kursen und gefundenen Links. Ein gefundener Link allein gilt weiterhin nicht als gelesenes Board.
 
-## Was gelesen wird
+## Besucherzugriff über den öffentlichen Link
 
-- Board-Titel, Beschreibung, vom Anbieter gelieferte Ersteller und Zeitstempel.
-- Texte von Stickies, Textfeldern, Formen, Karten und Frames.
-- Strukturierte Textblöcke von Miro-Dokumenten, sofern sie tatsächlich in der API-Antwort enthalten sind.
-- Der Titel eines übergeordneten Frames, um Aufgaben räumlich einzuordnen.
+Lehrkräfte teilen Boards meist aus ihren eigenen Miro-Konten. Eine OAuth-Verbindung sieht solche Boards in der Regel nicht. Der Besucherweg braucht deshalb nur den Link:
 
-Jede Quelle verweist auf das Original-Board beziehungsweise das konkrete Element (`moveToWidget`). Ersteller werden aus Miro-Metadaten übernommen und nicht aus dem Namen der Person abgeleitet, die den Link auf Spaces veröffentlicht hat. Fehlende Namen und Zeitstempel bleiben leer.
+1. **Titel und Besitz:** Nach einer Board-Suche fragt Context für höchstens 20 noch unbekannte Boards den dokumentierten oEmbed-Endpunkt von Miro ab (`https://miro.com/api/v1/oembed`). Ohne Cookies, ohne Weiterleitungen, mit Zeit- und Größenlimit. Übernommen werden nur Titel und Besitz; ein eigener Titel hat Vorrang. Nicht gefundene Boards werden höchstens wöchentlich erneut geprüft.
+2. **Inhalt:** Beim Lesen einer Kursquelle öffnet die Desktop-App das Board in einer unsichtbaren, stummgeschalteten Ansicht der Website-Sitzung. Dort aktiviert sie Miros barrierefreie Board-Übersicht („Board-Inhalte erkunden“ / „Explore board content“). Diese Übersicht ist ein schreibgeschütztes Inhaltsverzeichnis für Screenreader.
+3. **Auslesen:** Gelesen werden nur die Elemente der Übersicht (`#a11y-dom-contents`) anhand ihrer Rollen und Kennungen: Frames („Titel, Rahmen/Frame, n von m“), Auswahlgruppen und Elemente mit ihrem Text. Leere Elemente („Leer“/„Empty“), Auswahlzähler und generische Verbindungslinien werden entfernt.
+4. **Ergebnis:** Jeder Frame wird eine Quelle, typischerweise eine Folie. Verschachtelte Frames nennen ihren übergeordneten Bereich; Elemente außerhalb von Frames werden nach ihrer obersten Gruppe gebündelt. Jede Quelle verweist über `moveToWidget` auf genau dieses Element im Original-Board. Das Format entspricht dem API-Weg, sodass Suche und Assistent unverändert arbeiten.
 
-Bilder, hochgeladene PDFs, eingebettete Seiten und nicht unterstützte Elementtypen werden nicht heruntergeladen oder als gelesener Text ausgegeben. Ihre vorhandenen Titel sind nur Metadaten. Die Oberfläche erhält ausdrücklich eine unvollständige Abdeckung mit Warnungen. Eine vollständige API-Textabdeckung bedeutet keine vollständige Erkennung aller visuellen Informationen eines Boards.
+Nur Navigation innerhalb von `miro.com` ist erlaubt. Eine Anmeldeseite, eine fremde Weiterleitung oder eine Zugriffsanfrage erzeugen sichtbare Zustände: *Anmeldung nötig*, *für Besucher nicht freigegeben* oder *Board-Übersicht nicht verfügbar*. Es gibt keine Klicks auf andere Bedienelemente, keine Eingaben, keine Popups und keine Downloads.
 
-## Grenzen und Sicherheit
+**Effizienz:** Es wird immer nur ein Board gleichzeitig gelesen. Die Übersicht gilt als fertig, wenn zwei aufeinanderfolgende Abfragen denselben Stand liefern (höchstens 60 Sekunden). Ein Hash über die Übersicht erkennt unveränderte Boards; deren Ergebnis wird ohne erneute Verarbeitung wiederverwendet. Das Board wird dafür dennoch kurz geöffnet, weil nur so eine Änderung erkennbar ist.
 
-Die native Schnittstelle erlaubt ausschließlich lesende GET-Aufrufe für ein bekanntes Board und dessen Elemente. Sie bietet keinen allgemeinen Miro-Proxy, keine Suche im gesamten Miro-Konto und keine Schreibaktionen. Vor und nach jedem Board-Abruf werden die aktuelle Kurszuordnung und die Kontorevision geprüft. Archivierte beziehungsweise entfernte Zuordnungen und zwischenzeitlich gewechselte Verbindungen verwerfen den Abruf.
+### Einladungslinks (`share_link_id`)
 
-Pagination ist auf 50 Elemente je Anfrage, 40 Seiten beziehungsweise 2.000 Elemente begrenzt. Elementtexte belegen zusammen höchstens eine Million Zeichen. Ein einzelnes Element enthält höchstens 12.000 Textzeichen; für Suche und Chat werden Quellen anschließend ohne Überlappung in Stücke mit maximal 12.000 Zeichen geteilt. Grenzen, übersprungene Inhalte und Fehler erscheinen ausdrücklich als unvollständiger Zugriff.
+Manche Links enthalten einen Einladungsschlüssel. Er kann für den Zugriff nötig sein und wird deshalb nicht mehr verworfen, sondern getrennt behandelt:
 
-Miro-Texte sind untrusted Quellenmaterial. HTML wird in inerten Text umgewandelt; Skripte, eingebettete Seiten und SVG-Inhalte werden nicht ausgeführt. Links in Anbieterantworten werden nicht automatisch geöffnet oder als Pagination-Ziel verwendet. Die Miro-API wird über Nango erreicht; dies ist eine Cloud-Anbindung und keine ausschließlich lokale Übertragung.
+- Die Kursseiten-Leser geben ihn in einem eigenen Feld an den nativen Prozess. Dieser entfernt das Feld, bevor die Seite die Oberfläche erreicht. Aus Notizen, Lesezeichen und Kurslinks reicht die Oberfläche gefundene Einladungslinks einmalig an die Desktop-App weiter.
+- Die Desktop-App speichert je Board einen Schlüssel ausschließlich mit der Betriebssystem-Verschlüsselung (`miro/miro-links.enc`, höchstens 2.000 Boards). Ohne verfügbare Verschlüsselung bleibt er nur bis zum Beenden im Arbeitsspeicher.
+- Angehängt wird er nur, wenn die unsichtbare Ansicht genau dieses Board öffnet.
+- Fundstellen, Verzeichnis-Export, Suchindex, Quellenlinks, KI-Anfragen, oEmbed-Abfragen und Fehlermeldungen enthalten ihn nicht. Die native Schnittstelle gibt nur eine Anzahl zurück, nie den Schlüssel.
 
-Die Einrichtung und Datenabfrage wurden mit synthetischen Anbieterantworten geprüft. Ein reales Konto benötigt seine eigene gültige Freigabe. Die Tests zeigen keine erfolgreichen Zugriffe auf ein sonst gesperrtes Nutzer-Board an.
+### Grenzen des Besucherwegs
+
+- Die barrierefreie Übersicht ist **keine offizielle Miro-Schnittstelle**. Miro kann Aufbau, Kennungen oder Beschriftungen ändern; dann meldet Context „Board-Übersicht nicht verfügbar“ statt falscher Inhalte. Erkannt werden deutsche und englische Beschriftungen.
+- **Bilder** werden nicht gelesen; bekannt ist nur ihr Dateiname (`[Bild: name.png]`). Folien, die nur aus Bildern bestehen, sind deshalb nur als Titel und Dateinamen enthalten und als unvollständig markiert. Eine Bilderkennung per lokaler OCR ist noch nicht eingebaut.
+- Absätze innerhalb eines Elements werden getrennt, wenn Miro sie als Blöcke ausgibt; sonst können Zeilen zusammenhängen.
+- Boards, die eine Anmeldung oder eine Einladung als Gast verlangen, sind nur lesbar, wenn die eingebaute Browser-Sitzung bereits Zugriff hat.
+- Grenzen: 4.000 Übersichtselemente, 2.000 Zeichen je Element, 12.000 Zeichen je Bereich, 2.000 Bereiche, eine Million Zeichen je Board. Erreichte Grenzen erscheinen als unvollständiger Zugriff.
+
+## Miro-API über Nango
+
+In Nango muss eine Integration mit dem Anbieter **miro** und dem OAuth-Scope **boards:read** eingerichtet sein. Anschließend wird das Miro-Konto in Context verbunden. Miro kann die Zustimmung eines Team-Administrators verlangen; öffentlich sichtbare oder geteilte Board-Links bedeuten nicht automatisch, dass eine OAuth-App darauf zugreifen darf. In diesem Fall greift der Besucherweg.
+
+OAuth und Token-Erneuerung übernimmt Nango. Ein Nango-Zugriffsschlüssel bleibt im nativen Prozess beziehungsweise dessen vorhandenem verschlüsselten Einstellungsbestand. Er wird weder an den Chatbot noch an eingebettete Webseiten weitergegeben. Die Integration benötigt keinen separat konfigurierten MCP-Server.
+
+Gelesen werden Board-Titel, Beschreibung, Ersteller und Zeitstempel; Texte von Stickies, Textfeldern, Formen, Karten und Frames; strukturierte Textblöcke von Miro-Dokumenten, sofern sie in der API-Antwort enthalten sind; der Titel eines übergeordneten Frames. Bilder, hochgeladene PDFs, eingebettete Seiten und nicht unterstützte Elementtypen werden nicht heruntergeladen. Pagination ist auf 50 Elemente je Anfrage, 40 Seiten beziehungsweise 2.000 Elemente begrenzt.
+
+## Sicherheit und Datenschutz
+
+- Miro-Texte sind untrusted Quellenmaterial. Sie werden als inerter Text behandelt; Markup, Steuer- und Richtungszeichen werden nicht ausgeführt beziehungsweise entfernt. Text in einem Element kann keine Frames, Bereiche oder Links erzeugen.
+- Die native Schnittstelle liest nur Boards, die einem aktuell freigegebenen Kurs zugeordnet sind. Vor und nach jedem Lesen werden Kurszuordnung und Quellenstand geprüft; ein Wechsel verwirft das Ergebnis.
+- Besucher-Ergebnisse sind an den Besuchermodus gebunden, API-Ergebnisse an die Nango-Verbindung. Entfällt ein Modus, verschwinden dessen Quellen aus Suche und Assistent.
+- Beide Wege sind Cloud-Zugriffe: Miro sieht, dass das Board aufgerufen wird (beim Besucherweg wie bei einem normalen Seitenbesuch). Die API wird über Nango erreicht.
+
+## Manuell prüfen (Desktop-App)
+
+Automatische Tests verwenden synthetische Daten. Mit echten Boards gilt erst etwas als geprüft, wenn es so nachvollzogen wurde:
+
+1. `npm run desktop` starten; in **Verbindungen** muss Miro *nicht* verbunden sein.
+2. Einen Kurs öffnen und unter dessen Links ein öffentliches Board eintragen, z. B. `https://miro.com/app/board/o9J_kuapqg4=/`.
+3. **Boards → Lokale Quellen prüfen**: Die Karte zeigt nach kurzer Zeit den Miro-Titel und „Board-Besitz laut Miro“.
+4. **Quellen → Deine Quellen → Lesen** beim Board: Nach etwa 10 bis 30 Sekunden erscheinen die Bereiche. In den Warnungen steht „Besucherzugriff, keine offizielle Schnittstelle“.
+5. Im Assistenten nach einem Folientitel fragen (für das Beispiel „Agenda“ oder „Leadership Styles“). Der Quellenlink muss das Board an genau diesem Frame öffnen.
+6. Gegenprobe: ein privates Board → Meldung *für Besucher nicht freigegeben* oder *Anmeldung nötig*, keine Inhalte.
+7. Optional einen Link mit `?share_link_id=…` in eine Notiz legen, erneut suchen und prüfen, dass der Schlüssel weder in der Board-Karte noch im Verzeichnis-Export auftaucht.
 
 ## Referenzen
 
-[Miro: Board lesen](https://developers.miro.com/reference/get-specific-board-1), [Miro: Elemente und Cursor-Pagination](https://developers.miro.com/reference/get-items-1), [Nango: Miro-Autorisierung und Proxy](https://nango.dev/docs/integrations/all/miro).
+[Miro: oEmbed](https://developers.miro.com/docs/oembed-live-embed), [Miro: Barrierefreie Board-Übersicht](https://help.miro.com/hc/en-us/articles/4403828752274), [Miro: Board lesen](https://developers.miro.com/reference/get-specific-board-1), [Miro: Elemente und Cursor-Pagination](https://developers.miro.com/reference/get-items-1), [Nango: Miro-Autorisierung und Proxy](https://nango.dev/docs/integrations/all/miro).

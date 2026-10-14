@@ -149,7 +149,7 @@ function documentRead(options,validate,validateFile,describeFile){
     const fullText=parts.join('\n');let limit=Math.min(60000,fullText.length);
     const high=index=>index>=0&&/[\uD800-\uDBFF]/.test(fullText[index]),low=index=>index<fullText.length&&/[\uDC00-\uDFFF]/.test(fullText[index]);
     if(high(limit-1)&&low(limit))limit--;const start=Math.min(options.offset,limit);if(low(start)&&high(start-1))throw new Error('Ungültige Textgrenze. Bitte nextOffset verwenden.');let end=Math.min(start+5000,limit);if(high(end-1)&&low(end))end--;
-    const links=[],boards=[],items=[],files=[],unique=new Set(),uniqueFiles=new Set();let inspected=0,linksTruncated=false;
+    const links=[],boards=[],boardInvites=[],items=[],files=[],unique=new Set(),uniqueFiles=new Set();let inspected=0,linksTruncated=false;
     for(const anchor of root.querySelectorAll('a[href]')){
       if(++inspected>5000){linksTruncated=true;break;}if(!visible(anchor)||anchor.closest('form,[contenteditable=true],header,footer')||anchor.closest('nav')&&!anchor.closest('.pagination,.nav-links,[aria-label=pagination]'))continue;
       const title=(anchor.innerText||anchor.getAttribute('aria-label')||'Link').trim().slice(0,200);let target='';try{target=validate(options.service,anchor.href,options.scope);}catch{}
@@ -157,10 +157,10 @@ function documentRead(options,validate,validateFile,describeFile){
       const metadata={postedBy:visible(author)?author.innerText.trim().slice(0,200):'',postedAt:clock(timeEl),updatedAt:clock(updated)};
       try{const fileURL=validateFile(options.service,anchor.href,options.scope);if(!uniqueFiles.has(fileURL)&&files.length<50){uniqueFiles.add(fileURL);files.push({url:fileURL,title,...metadata,...describeFile(options.service,fileURL,options.scope)});}}catch{}
       if(target&&!unique.has(target)){unique.add(target);if(links.length<500)links.push({url:target,title,...metadata});else linksTruncated=true;if(row&&items.length<50)items.push({url:target,title,...metadata,excerpt:visibleText(row)});}
-      try{const u=new URL(anchor.href),match=/^\/app\/board\/([a-zA-Z0-9_=-]{4,100})\/?$/.exec(decodeURIComponent(u.pathname));if(u.protocol==='https:'&&['miro.com','www.miro.com'].includes(u.hostname)&&!u.username&&!u.password&&!u.port&&match&&boards.length<50)boards.push({url:'https://miro.com/app/board/'+match[1]+'/',title,...metadata,sourceURL:target||url});}catch{}
+      try{const u=new URL(anchor.href),match=/^\/app\/board\/([a-zA-Z0-9_=-]{4,100})\/?$/.exec(decodeURIComponent(u.pathname));if(u.protocol==='https:'&&['miro.com','www.miro.com'].includes(u.hostname)&&!u.username&&!u.password&&!u.port&&match&&boards.length<50){boards.push({url:'https://miro.com/app/board/'+match[1]+'/',title,...metadata,sourceURL:target||url});const share=u.searchParams.get('share_link_id')||'';if(/^[A-Za-z0-9_-]{4,80}$/.test(share)&&boardInvites.length<100)boardInvites.push({url:'https://miro.com/app/board/'+match[1]+'/',share});}}catch{}
     }
     const title=document.title.slice(0,200),data=new TextEncoder().encode(JSON.stringify([url,title,fullText,overflow,links,items,itemsTruncated,boards,files])),digest=await crypto.subtle.digest('SHA-256',data),contentRevision=[...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
-    return {url,title,text:fullText.slice(start,end),offset:start,nextOffset:end,hasMore:end<limit,totalLength:limit,textTruncated:overflow||fullText.length>limit,contentRevision,links:links.slice(options.linkOffset,options.linkOffset+45),totalLinks:links.length,linkOffset:options.linkOffset,linksHasMore:options.linkOffset+45<links.length,linksTruncated,items,itemsTruncated,boardLinks:boards,fileLinks:files,loginRequired:false,permissionRequired:false};
+    return {url,title,text:fullText.slice(start,end),offset:start,nextOffset:end,hasMore:end<limit,totalLength:limit,textTruncated:overflow||fullText.length>limit,contentRevision,links:links.slice(options.linkOffset,options.linkOffset+45),totalLinks:links.length,linkOffset:options.linkOffset,linksHasMore:options.linkOffset+45<links.length,linksTruncated,items,itemsTruncated,boardLinks:boards,boardInvites,fileLinks:files,loginRequired:false,permissionRequired:false};
   })();
 }
 
@@ -190,7 +190,7 @@ function validMessage(message){
  * There is one recyclable, hidden view and no password/SSO automation method.
  * getAuthRevision observes session changes without exporting cookie values.
  */
-export function createServiceReader({createView,destroyView, getSources,openVisible,fetchText,readDocument,getAuthRevision=()=>0,settleMs=250,now=()=>new Date().toISOString()}){
+export function createServiceReader({createView,destroyView, getSources,openVisible,fetchText,readDocument,rememberInvites=()=>{},getAuthRevision=()=>0,settleMs=250,now=()=>new Date().toISOString()}){
   if(typeof createView!=='function'||typeof getSources!=='function'||typeof openVisible!=='function')throw new TypeError('Dienstleser benötigt View, Quellen und Browserhandoff.');
   let active,disposed=false,queue=Promise.resolve();const requests=new Map();
   const sources=()=>validateServiceSources(getSources());
@@ -230,7 +230,7 @@ export function createServiceReader({createView,destroyView, getSources,openVisi
   async function snapshot(record,entry,options={}){
     assertCurrent(record);const wc=entry.view.webContents,url=serviceURL(record.source.service,wc.getURL(),record.source.url),epoch=entry.epoch;
     const check=()=>{assertCurrent(record);if(entry!==active||entry.epoch!==epoch||wc.getURL()!==url)throw error('Die Dienstansicht hat sich geändert. Bitte erneut lesen.','NAVIGATION_CHANGED');};
-    const read=async()=>{check();const page=await wait(wc.executeJavaScriptInIsolatedWorld(1002,[{code:serviceReadScript(record.source.service,record.source.url,options)}]),record);check();if(page?.loginRequired||page?.permissionRequired)return status(record,page.loginRequired?'login':'permission');if(!page||page.url!==url||!/^[a-f0-9]{64}$/.test(page.contentRevision||'')||typeof page.text!=='string'||page.text.length>5000)throw error('Ungültiger Dienstinhalt.','INVALID_PAGE');return page;};
+    const read=async()=>{check();const page=await wait(wc.executeJavaScriptInIsolatedWorld(1002,[{code:serviceReadScript(record.source.service,record.source.url,options)}]),record);check();const invites=page?.boardInvites;if(page&&typeof page==='object')delete page.boardInvites;if(Array.isArray(invites)&&invites.length)try{rememberInvites(invites.slice(0,100));}catch{}if(page?.loginRequired||page?.permissionRequired)return status(record,page.loginRequired?'login':'permission');if(!page||page.url!==url||!/^[a-f0-9]{64}$/.test(page.contentRevision||'')||typeof page.text!=='string'||page.text.length>5000)throw error('Ungültiger Dienstinhalt.','INVALID_PAGE');return page;};
     let page=await read();if(page.coverage==='none'){clearLease();return page;}
     if(options.offset===undefined||options.offset===0){if(!options.linkOffset&&!options.expectedRevision){let stable=settleMs===0;for(let i=0;!stable&&i<4;i++){await pause(record,settleMs);check();const next=await read();if(next.coverage==='none'){clearLease();return next;}stable=next.contentRevision===page.contentRevision;page=next;}if(!stable)throw error('Die Dienstansicht lädt noch. Bitte erneut versuchen.','CONTENT_UNSTABLE');}}
     if(options.expectedRevision&&page.contentRevision!==options.expectedRevision)throw error('Der Quelleninhalt wurde geändert. Bitte erneut beginnen.','CONTENT_CHANGED');

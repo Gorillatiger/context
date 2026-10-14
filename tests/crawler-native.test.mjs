@@ -28,7 +28,7 @@ function fixture(t,{loadHook,readHook,status=200}={}){
   const page={url:current,title:'Synthetic course',text:'Visible text',offset:options.offset,nextOffset:options.offset+12,totalLength:12,hasMore:false,textTruncated:false,contentRevision:revision,links:[{title:'Observed post',url:COURSE+'post/'}],linkOffset:options.linkOffset,totalLinks:1,linksHasMore:false,controls:[{id:options.controlOffset?'accordion-item-later':'secondary-swap-menu-label',title:'Observed course section'}],controlOffset:options.controlOffset,totalControls:31,controlsMore:!options.controlOffset,boardLinks:[],metadata:{sourceURL:current,postedAt:''}};
   return readHook?.(page,options,executed.length)||page;
  };
- const sandbox={boardScanTab:tab,boardScanQueue:Promise.resolve(),activeScanRequest:undefined,crawlLease:undefined,crawlLeaseTimer:undefined,requests:new Map(),tabs:new Map(),active:'',requestsFromFixture:[],safeSpacesURL,browserURL,crawlerURL,readScript,readerPlatformLinks,
+ const sandbox={desktopMiroLinks:undefined,boardScanTab:tab,boardScanQueue:Promise.resolve(),activeScanRequest:undefined,crawlLease:undefined,crawlLeaseTimer:undefined,requests:new Map(),tabs:new Map(),active:'',requestsFromFixture:[],safeSpacesURL,browserURL,crawlerURL,readScript,readerPlatformLinks,
   boardFinding:()=>{throw Error('Synthetic legacy has no Miro links');},emit:(type,value)=>events.push({type,...structuredClone(value)}),setTimeout:schedule,clearTimeout:unschedule,AbortController,DOMException,displayURL:URL=>URL,
  };
  vm.createContext(sandbox);vm.runInContext(code,sandbox);t.after(()=>vm.runInContext('clearCrawlLease()',sandbox));

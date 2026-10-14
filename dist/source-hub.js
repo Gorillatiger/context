@@ -8,6 +8,8 @@ import {renderSourceFiles} from './source-files.js';
 const labels={miro:'Miro',gitlab:'GitLab',sciebo:'Sciebo',mattermost:'Mattermost'};
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const abort=()=>new DOMException('Abgebrochen','AbortError');
+// A Miro row stays valid for the connection that produced it: the Nango account, or the public visitor overview.
+const miroAccount=(status,generation)=>!!status&&/^[a-f0-9]{64}$/.test(generation||'')&&(status.connected===true&&status.boardRead!==false&&generation===status.generation||status.visitor===true&&generation===status.visitorGeneration);
 const digest=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
 const originIcon='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 14 4-4M8 16l-1 1a4.2 4.2 0 0 1-6-6l4-4a4.2 4.2 0 0 1 6 0m2 10a4.2 4.2 0 0 0 6 0l4-4a4.2 4.2 0 0 0-6-6l-1 1"/></svg>';
 const controlIcon=name=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+({read:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 8a7 7 0 0 1 12-2l2 3M4 15l2 3a7 7 0 0 0 12-2"/>',open:'<path d="M9 4H4v16h16v-5m-7-11h7v7m-11 4L20 4"/>',connect:'<path d="m9 6-3 3a5 5 0 0 0 7 7l3-3M7 2l4 4m7 7 4 4M3 7l4 4m7 7 4 4m-8 1-3 3"/>'}[name]||'')+'</svg>';
@@ -19,7 +21,7 @@ export function createSourceHub({getWorkspace,onChange=()=>{},onNotice=()=>{},on
   const catalog=()=>platformCatalog(getWorkspace());
   const changed=()=>{if(!closed)onChange();};
   function current(row){return catalog().some(source=>source.id===row.sourceId&&source.revision===row.revision&&source.url===row.url&&source.projectId===row.projectId&&source.service===row.service);}
-  function currentAccount(row){return row.service==='miro'?miroStatus?.connected===true&&miroStatus.boardRead!==false&&row.accountGeneration===miroStatus.generation:!!registry?.accounts?.[row.service]&&row.accountGeneration===registry.accounts[row.service];}
+  function currentAccount(row){return row.service==='miro'?miroAccount(miroStatus,row.accountGeneration):!!registry?.accounts?.[row.service]&&row.accountGeneration===registry.accounts[row.service];}
   function documents(){return rows.filter(current).flatMap(row=>row.documents.map(doc=>({...doc,accountGeneration:row.accountGeneration})));}
   async function native(channel,message,signal){
     if(!available())throw new Error('Aktuelle Context-Desktop-App benötigt.');if(signal?.aborted)throw abort();
@@ -41,7 +43,7 @@ export function createSourceHub({getWorkspace,onChange=()=>{},onNotice=()=>{},on
     const token=epoch,pending=(async()=>{
       const reply=await bridge.service({action:'registry',sources});if(token!==epoch||closed)throw abort();if(reply?.ok!==true)throw new Error(reply?.error||'Quellenregistrierung fehlgeschlagen.');
       const value=reply.value;if(!value||!/^[a-f0-9]{64}$/.test(value.generation||'')||!value.accounts||typeof value.accounts!=='object'||sources.some(source=>source.service!=='miro'&&!/^[a-f0-9]{64}$/.test(value.accounts[source.service]||'')))throw new Error('Ungültiger Kontostand.');
-      const miro=await native('miro',{action:'status'});if(token!==epoch||closed)throw abort();if(miro?.connected&&(!/^[a-f0-9]{64}$/.test(miro.generation||'')))throw new Error('Ungültiger Miro-Kontostand.');
+      const miro=await native('miro',{action:'status'});if(token!==epoch||closed)throw abort();if(miro?.connected&&(!/^[a-f0-9]{64}$/.test(miro.generation||''))||miro?.visitor&&!/^[a-f0-9]{64}$/.test(miro.visitorGeneration||''))throw new Error('Ungültiger Miro-Kontostand.');
       registry=value;miroStatus=miro;rows=rows.filter(row=>current(row)&&currentAccount(row));
     })();registryPromise=pending;
     try{return await pending;}finally{if(registryPromise===pending)registryPromise=null;}
@@ -86,7 +88,7 @@ export function createSourceHub({getWorkspace,onChange=()=>{},onNotice=()=>{},on
       const accountGeneration=source.service==='miro'?value.generation:value.accountGeneration;
       if(!/^[a-f0-9]{64}$/.test(accountGeneration||'')||value.scopeGeneration!==registry?.generation)throw new Error('Die Quellenanmeldung wurde geändert.');
       docs=docs.map(doc=>({...doc,accountGeneration}));
-      if(source.service==='miro'){const latest=await native('miro',{action:'status'},signal);if(!latest?.connected||latest.boardRead===false||latest.generation!==accountGeneration)throw new Error('Die Miro-Anmeldung wurde geändert.');miroStatus=latest;}
+      if(source.service==='miro'){const latest=await native('miro',{action:'status'},signal);if(!miroAccount(latest,accountGeneration))throw new Error('Die Miro-Anmeldung wurde geändert.');miroStatus=latest;}
       else if(accountGeneration!==registry.accounts?.[source.service])throw new Error('Die Quellenanmeldung wurde geändert.');
       const guard=()=>{if(!catalog().some(row=>row.id===source.id&&row.revision===source.revision&&row.url===source.url&&row.projectId===source.projectId)||!currentAccount({service:source.service,accountGeneration}))throw abort();};
       let record;await commit(previous=>{

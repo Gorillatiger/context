@@ -27,8 +27,10 @@ import {createDiaryReminders} from './diary-reminders.mjs';
 import {createDesktopPlatform} from './platform.mjs';
 import {createDocumentReader} from './document-reader.mjs';
 import {createCourseFileFetch} from './course-file-fetch.mjs';
+import {createMiroShareLinks} from './miro-links.mjs';
+import {createMiroVisitorReader} from './miro-visitor.mjs';
 const desktopAI=createDesktopAI();
-let desktopCalendar,desktopNango,desktopNangoMail,desktopPlatform,desktopSpacesSearch;
+let desktopCalendar,desktopNango,desktopNangoMail,desktopPlatform,desktopSpacesSearch,desktopMiroLinks;
 const desktopOCR=createDesktopOCR();
 const desktopDocumentReader=createDocumentReader();
 app.setName('Context Browser');
@@ -103,6 +105,7 @@ async function read(t,offset=0,options={},record){await loaded(t,record);const w
  if(blocked(page))return page;
  if(options.crawler&&!options.expectedRevision&&offset===0&&!(options.linkOffset||options.controlOffset)){let settled=false;for(let attempt=0;attempt<4;attempt++){await crawlerPause(record);assertCurrent();const next=await snapshot();if(blocked(next))return next;if(next.contentRevision===page.contentRevision){page=next;settled=true;break;}page=next;}if(!settled)throw new Error('Die Kursansicht ist noch nicht stabil. Bitte später erneut beginnen.');}
  assertCurrent();
+ desktopMiroLinks?.take(page);
  page.platformLinksMore=page.platformLinksMore===true||Array.isArray(page.platformLinks)&&page.platformLinks.length>100;
  page.platformLinks=readerPlatformLinks(page);
  if(options.crawler){page.url=crawlerURL(page.url,options.courseURL);page.epoch=epoch;if(!/^[a-f0-9]{64}$/.test(page.contentRevision||'')||options.expectedRevision&&options.expectedRevision!==page.contentRevision)throw new Error('Der gelesene Kursinhalt hat sich geändert. Bitte die Ansicht erneut beginnen.');page.links=(page.links||[]).slice(0,45).flatMap(link=>{try{return [{title:String(link.title).slice(0,160),url:crawlerURL(link.url,options.courseURL)}];}catch{return [];}});page.controls=(page.controls||[]).slice(0,30).filter(control=>/^(primary-swap-menu-label|secondary-swap-menu-label|accordion-item-[a-zA-Z0-9_-]{1,80})$/.test(control.id));if(t.contentRevision!==page.contentRevision||t.readAt!==url){t.links.clear();t.controls.clear();}for(const link of page.links)t.links.add(link.url);for(const control of page.controls)t.controls.add(control.id);t.contentRevision=page.contentRevision;t.readAt=url;return page;}
@@ -158,7 +161,13 @@ providerSession.setPermissionRequestHandler((_w,_p,callback)=>callback(false));p
 providerSession.webRequest.onBeforeRequest((details,callback)=>callback({cancel:!requestURL(details.url)}));
 // No background downloads or automatic execution. The user chooses every destination.
 providerSession.on('will-download',(_e,item)=>{item.setSaveDialogOptions({title:'Datei aus dem Browser speichern',defaultPath:path.basename(item.getFilename())});});
-desktopPlatform=createDesktopPlatform({nango:desktopNango,getAccountFingerprint:async service=>{const host=({gitlab:'git.coco.study',sciebo:'th-koeln.sciebo.de',mattermost:'chat.coco.study'})[service];const cookies=await providerSession.cookies.get({});return createHash('sha256').update(JSON.stringify([service,cookies.filter(cookie=>{const domain=String(cookie.domain||'').replace(/^\./,'');return (host===domain||host.endsWith('.'+domain))&&(cookie.httpOnly||/session|token|auth|userid/i.test(cookie.name));}).map(cookie=>[cookie.domain,cookie.path,cookie.name,cookie.value]).sort((a,b)=>String(a.slice(0,3)).localeCompare(String(b.slice(0,3))))])).digest('hex');},createView:({webPreferences})=>{const view=new WebContentsView({webPreferences});view.setBounds({x:0,y:0,width:1280,height:900});return view;},destroyView:view=>{if(!view.webContents.isDestroyed())view.webContents.close();},openVisible:url=>openInHub(url),emit:detail=>emit('context-platform-auth',detail),fetchText:createCourseFileFetch({session:providerSession}),readDocument:request=>desktopDocumentReader.read(request)});
+desktopMiroLinks=createMiroShareLinks({directory:path.join(app.getPath('userData'),'miro'),crypto:safeStorage});
+await desktopMiroLinks.initialize();
+// Public Miro boards are read as a visitor in a hidden, muted view of the website partition.
+const miroVisitor=createMiroVisitorReader({getShareLink:id=>desktopMiroLinks.get(id),
+ createView:({webPreferences})=>{const view=new WebContentsView({webPreferences});view.setBounds({x:0,y:0,width:1280,height:900});view.setVisible(false);if(win&&!win.isDestroyed())win.contentView.addChildView(view);return view;},
+ destroyView:view=>{try{if(win&&!win.isDestroyed())win.contentView.removeChildView(view);}catch{}if(!view.webContents.isDestroyed())view.webContents.close();}});
+desktopPlatform=createDesktopPlatform({nango:desktopNango,miroVisitor,miroLinks:desktopMiroLinks,getAccountFingerprint:async service=>{const host=({gitlab:'git.coco.study',sciebo:'th-koeln.sciebo.de',mattermost:'chat.coco.study'})[service];const cookies=await providerSession.cookies.get({});return createHash('sha256').update(JSON.stringify([service,cookies.filter(cookie=>{const domain=String(cookie.domain||'').replace(/^\./,'');return (host===domain||host.endsWith('.'+domain))&&(cookie.httpOnly||/session|token|auth|userid/i.test(cookie.name));}).map(cookie=>[cookie.domain,cookie.path,cookie.name,cookie.value]).sort((a,b)=>String(a.slice(0,3)).localeCompare(String(b.slice(0,3))))])).digest('hex');},createView:({webPreferences})=>{const view=new WebContentsView({webPreferences});view.setBounds({x:0,y:0,width:1280,height:900});return view;},destroyView:view=>{if(!view.webContents.isDestroyed())view.webContents.close();},openVisible:url=>openInHub(url),emit:detail=>emit('context-platform-auth',detail),fetchText:createCourseFileFetch({session:providerSession}),readDocument:request=>desktopDocumentReader.read(request)});
 providerSession.cookies.on('changed',(_event,cookie)=>{if(!cookie.httpOnly&&!/session|token|auth|userid/i.test(cookie.name||''))return;const domain=String(cookie.domain||'').replace(/^\./,'');for(const [host,service] of Object.entries({'git.coco.study':'gitlab','th-koeln.sciebo.de':'sciebo','chat.coco.study':'mattermost'}))if(host===domain||host.endsWith('.'+domain))desktopPlatform.invalidate(service);});
 
 win=new BrowserWindow({width:1440,height:940,minWidth:850,minHeight:600,title:'Context Browser · '+app.getVersion(),backgroundColor:desktopTheme.backgroundColor(),webPreferences:{partition:'persist:context-workspace',preload:fileURLToPath(new URL('./preload.cjs',import.meta.url)),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,navigateOnDragDrop:false}});
@@ -178,7 +187,7 @@ Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Context Browser',submenu
 app.on('second-instance',()=>{app.show();win?.show();win?.focus();});
 app.on('activate',()=>{app.show();win?.show();win?.focus();});
 sessionKeeper=createProviderSessionKeeper({cookies:providerSession.cookies,crypto:safeStorage,profile:app.getPath('userData'),onChange:()=>state()});
-app.on('before-quit',async event=>{if(quitReady)return;event.preventDefault();if(quitPending)return;quitPending=true;cancelAgentRequests();desktopSpacesSearch.dispose();desktopPlatform.dispose();desktopDocumentReader.dispose();desktopSpeech.dispose();desktopNangoMail.dispose();await desktopNango.dispose();await desktopChatFilter.dispose();await desktopDevDiary.dispose();await desktopDiaryReminders.dispose();await desktopTheme.flush();desktopTheme.dispose();await sessionKeeper.flush();providerSession.flushStorageData();quitReady=true;app.quit();});
+app.on('before-quit',async event=>{if(quitReady)return;event.preventDefault();if(quitPending)return;quitPending=true;cancelAgentRequests();desktopSpacesSearch.dispose();desktopPlatform.dispose();desktopDocumentReader.dispose();desktopSpeech.dispose();desktopNangoMail.dispose();await desktopNango.dispose();await desktopChatFilter.dispose();await desktopDevDiary.dispose();await desktopDiaryReminders.dispose();await desktopTheme.flush();desktopTheme.dispose();await desktopMiroLinks?.flush();await sessionKeeper.flush();providerSession.flushStorageData();quitReady=true;app.quit();});
 await ensureServer();
 await win.loadURL(HUB+'/#today').catch(()=>dialog.showErrorBox('Context-Server starten','Bitte zuerst start.command im context-hub-Ordner starten. Der lokale Server läuft auf Port 4318.'));
 
