@@ -4,7 +4,7 @@ In **Notizen → Dev Diary** einen vorhandenen Spaces-Kurs und die Kursphase wä
 
 ## Schreiben und diktieren
 
-Das Mikrofon neben einer Frage diktiert direkt in dieses Feld. Alternativ **Diktieren** öffnen und das Zielfeld wählen. Die vorhandene lokale whisper.cpp-/Silero-Erkennung verarbeitet Deutsch; Modellwahl, Downloadfortschritt, Pausendauer und CPU-Fallback stehen unter den Spracheinstellungen. Ein Modell muss einmal heruntergeladen werden; danach funktioniert die Erkennung offline. Die Spracheingabe braucht die Desktop-App und eine Mikrofonberechtigung. Details zu Einrichtung und Plattformgrenzen stehen in `SPEECH.md`.
+Das Mikrofon neben einer Frage diktiert direkt in dieses Feld. Alternativ **Diktieren** öffnen und das Zielfeld wählen. Die vorhandene lokale whisper.cpp-/Silero-Erkennung verarbeitet Deutsch; Modellwahl, Downloadfortschritt, Pausendauer und CPU-Fallback stehen unter den Spracheinstellungen. Ein Modell muss einmal heruntergeladen werden; danach funktioniert die Erkennung offline. Die Spracheingabe braucht die Desktop-App und eine Mikrofonberechtigung. Details zu Einrichtung und Plattformgrenzen stehen in `LOCAL-SPEECH.md`.
 
 Diktate werden an vorhandenen Text angehängt, bleiben bearbeitbar und werden erst mit **Speichern** dauerhaft in den Diary-Daten gesichert. Es gibt keinen automatischen Versand, keinen KI-Aufruf und keinen Eintrag im Chatarchiv. Audio wird verworfen. Beim Tagwechsel, Schließen oder Wechsel zum Chatmikrofon wird die Aufnahme abgebrochen. Zu lange Diktate bleiben vollständig zum manuellen Kopieren sichtbar; das Feldlimit beträgt 4.000 Zeichen.
 
