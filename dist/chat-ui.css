@@ -145,3 +145,22 @@ body.ai-active .context-agent-launcher { display: none; }
 
 .ki-wait-notice{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:12px 18px;background:var(--coco-rose);color:var(--ink);border-top:1px solid var(--line);font-size:12px;line-height:1.5;flex-shrink:0;max-height:140px;overflow:auto}.ki-wait-notice>span{flex:1;min-width:150px}.ki-wait-notice>button{min-height:36px}.ki-wait-notice>small{flex-basis:100%;color:var(--muted);font-size:11px}
 @media(max-width:600px){.ki-wait-notice{padding:10px 12px}.ki-wait-notice>button{min-height:44px}}
+
+/* Assistant questions with selectable answers and source age */
+.ki-chat .ki-clarify { margin: 10px 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--coco-paper); }
+.ki-chat .ki-clarify fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; min-width: 0; }
+.ki-chat .ki-clarify legend { padding: 0; margin-bottom: 4px; font-size: 12px; color: var(--muted, #6b6b6b); }
+.ki-chat .ki-clarify-option { margin: 0; display: flex; align-items: flex-start; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; line-height: 1.35; }
+.ki-chat .ki-clarify-option:has(input:checked) { border-color: var(--coco-burgundy, #8a1538); background: color-mix(in srgb, var(--coco-burgundy, #8a1538) 8%, transparent); }
+.ki-chat .ki-clarify-option input { margin-top: 3px; flex: none; }
+.ki-chat .ki-clarify-option small { margin-left: 6px; font-size: 11px; color: var(--coco-burgundy, #8a1538); }
+.ki-chat .ki-clarify-other { margin: 0; display: grid; gap: 4px; font-size: 12px; }
+.ki-chat .ki-clarify-other input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: transparent; color: inherit; }
+.ki-chat .ki-clarify button[type=submit] { justify-self: start; }
+.ki-chat .ki-clarify-error { margin: 6px 0 0; font-size: 12px; color: #b3261e; }
+.ki-chat .ki-clarify-error:empty { display: none; }
+.ki-chat .ki-clarify.answered p { margin: 0; font-size: 13px; }
+.ki-chat .ki-source-age { display: inline-block; margin: 2px 0; font-size: 11px; font-style: normal; color: var(--muted, #6b6b6b); }
+.ki-chat .ki-source-age.old { color: #9a4a00; font-weight: 600; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ki-chat .ki-source-age.old { color: #ffb066; } }
+:root[data-theme="dark"] .ki-chat .ki-source-age.old { color: #ffb066; }

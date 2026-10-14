@@ -7,7 +7,7 @@ const array=(v,max)=>Array.isArray(v)?v.slice(0,max):[];
 const fields=(v,keys)=>Object.fromEntries(keys.filter(k=>typeof v?.[k]==='string').map(k=>[k,text(v[k],k==='content'?50000:2000)]));
 export function archiveSource(v){
   if(!v||typeof v!=='object')throw new Error('Ungültige Chatquelle.');
-  const out=fields(v,['id','kind','title','text','status','targetId','projectId','source','updatedAt','due','taskStatus']);out.text=text(v.text,70000);
+  const out=fields(v,['id','kind','title','text','status','targetId','projectId','source','updatedAt','postedAt','due','taskStatus']);out.text=text(v.text,70000);
   if(v.url){const u=new URL(v.url);if(u.protocol!=='https:'||u.username||u.password||/[\x00-\x20]/.test(v.url))throw new Error('Ungültiger Quellenlink.');out.url=u.href;}
   if(Number.isSafeInteger(v.offset))out.offset=v.offset;
   return out;
@@ -18,10 +18,14 @@ function proposal(v){
   const args=v.tool==='create_calendar'?structuredClone(validateCalendarTool(v.args)):fields(v.args,['title','content','projectId','due']);
   return {id:text(v.id,160),tool:v.tool,scope:text(v.scope,160),args,sources:array(v.sources,80).map(archiveSource),applied:bool(v.applied),undone:bool(v.undone),...(v.result?{result:result(v.result)}:{})};
 }
+function clarification(v){
+  const options=array(v?.options,6).filter(o=>typeof o==='string'&&o.trim()).map(o=>text(o,120));
+  return typeof v?.question==='string'&&v.question.trim()&&options.length>=2?{question:text(v.question,300),options,multiple:bool(v.multiple),answer:text(v.answer,1500)}:null;
+}
 function step(v){return {id:Number.isSafeInteger(v?.id)?v.id:0,...fields(v,['tool','label','detail']),status:['running','done','error'].includes(v?.status)?v.status:'done',undone:bool(v?.undone),sources:array(v?.sources,100).map(archiveSource),...(v?.action?{action:result(v.action)}:{})};}
 export function cleanChat(v){
   if(!v||v.version!==1||!/^[-\w]{1,160}$/.test(v.id)||!Array.isArray(v.messages)||v.messages.length>100)throw new Error('Ungültiges Chatarchiv.');
-  const messages=v.messages.map(m=>{if(!['user','assistant'].includes(m?.role)||typeof m.content!=='string'||m.content.length>50000)throw new Error('Ungültige Chatnachricht.');return {id:text(m.id,160),role:m.role,content:m.content,model:text(m.model,200),provider:provider(m.provider),failed:bool(m.failed),unverifiedCitations:bool(m.unverifiedCitations),totalTokens:Number.isFinite(m.totalTokens)?m.totalTokens:0,citations:array(m.citations,100).map(archiveSource),sources:array(m.sources,100).map(archiveSource),steps:array(m.steps,50).map(step),proposals:array(m.proposals,20).map(proposal)};});
+  const messages=v.messages.map(m=>{if(!['user','assistant'].includes(m?.role)||typeof m.content!=='string'||m.content.length>50000)throw new Error('Ungültige Chatnachricht.');return {id:text(m.id,160),role:m.role,content:m.content,model:text(m.model,200),provider:provider(m.provider),failed:bool(m.failed),unverifiedCitations:bool(m.unverifiedCitations),totalTokens:Number.isFinite(m.totalTokens)?m.totalTokens:0,citations:array(m.citations,100).map(archiveSource),sources:array(m.sources,100).map(archiveSource),steps:array(m.steps,50).map(step),proposals:array(m.proposals,20).map(proposal),...(m.role==='assistant'&&clarification(m.clarification)?{clarification:clarification(m.clarification)}:{})};});
   return {version:1,id:v.id,title:text(v.title,200),scope:text(v.scope,160),projectName:text(v.projectName,200),createdAt:text(v.createdAt,80),updatedAt:text(v.updatedAt,80),messages,draft:text(v.draft,6000),model:text(v.model,200),provider:provider(v.provider),steps:array(v.steps,50).map(step),interrupted:bool(v.interrupted),enabled:{...Object.fromEntries(['projects','notes','tasks','updates','calendar'].map(k=>[k,bool(v.enabled?.[k])])),bookmarks:v.enabled?.bookmarks!==false,browser:v.enabled?.browser!==false,platforms:v.enabled?.platforms!==false},browserEnabled:v.browserEnabled!==false,calendarDirect:v.calendarDirect!==false,attachments:array(v.attachments,1).map(archiveSource).filter(d=>d.kind==='photo'&&d.id&&d.text)};
 }
 export function recoverChat(v){const c=cleanChat(v);if(c.interrupted||c.steps.length){c.messages.push({id:crypto.randomUUID(),role:'assistant',content:'Der Auftrag wurde durch Neuladen oder Schließen unterbrochen. Es werden keine Werkzeuge automatisch fortgesetzt.',failed:true,citations:[],proposals:[],steps:c.steps.map(s=>({...s,status:s.status==='running'?'error':s.status,detail:s.status==='running'?'Beim Schließen unterbrochen':s.detail}))});c.steps=[];c.interrupted=false;}return c;}

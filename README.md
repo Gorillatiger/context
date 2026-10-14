@@ -35,7 +35,7 @@ Der interaktive Start mit optionalen Connector-Zugangsdaten erfolgt über `pytho
 | GitLab und Sciebo | Angemeldete, freigegebene Dienstquellen sowie angebotene Kursdateien; keine vollständige automatische Kopie aller privaten Dateien |
 | Kommunikation | Nachrichtenübersicht, Kursfilter, TH-Mail über IMAP/SMTP, Outlook/Gmail über eine konfigurierte Nango-Verbindung |
 | Kalender | Tag, Monat und Agenda, ICS-Import/Export, Anbieterabgleich mit stabilen IDs; kein allgemeiner Zweiwege-Sync sämtlicher Anbieter |
-| KI | KI:connect NRW, OpenRouter und lokale OpenAI-kompatible Modelle über LM Studio/Ollama; begrenzte Werkzeuge und Quellenbelege |
+| KI | KI:connect NRW, OpenRouter und lokale OpenAI-kompatible Modelle über LM Studio/Ollama; begrenzte Werkzeuge und Quellenbelege. Der Assistent fragt bei echter Mehrdeutigkeit gezielt nach (anklickbare Auswahlfelder, höchstens eine Rückfrage je Auftrag) und ordnet jede Quelle zeitlich ein: Datum, Semester und Alter (aktuell / älter / veraltet / unbekannt) stehen im Kontext, in den Quellenkarten und in der Antwort; bei nur älteren Treffern sucht er breiter, bevor er schließt |
 | KI-Limit | OpenRouter-Schlüsselbudget und Gratiszähler; Hochschul-KI: 10 Anfragen/Minute mit Warteanzeige; übrige Kontingente bleiben unbekannt, lokale Modelle haben kein Cloud-Kontingent |
 | Sprache | Offline-Transkription mit whisper.cpp und Silero VAD nach Modelldownload; Zwischenstand, Stoppen, Abbruch und bearbeitbarer Entwurf |
 | Browser | Electron/Chromium, gemeinsame lokale Dienstsitzung, Kursansichten, Inventar und optionaler WhatsApp-CoCo-Filter |

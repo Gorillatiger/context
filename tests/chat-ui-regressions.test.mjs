@@ -148,8 +148,8 @@ test('disabling a knowledge kind removes prior answers and their stale source co
  f.input('Neuer Entwurf ohne Notizen.');f.click('#ki-menu-settings');f.change('#ki-kind-notes',false);await settle();assert.equal(f.document.querySelectorAll('.ki-message').length,0);assert.equal(f.document.querySelector('[data-ki-action="source"]'),null);assert.equal(f.find('#ki-prompt').value,'Neuer Entwurf ohne Notizen.');source.click();assert.equal(f.sources.length,1,'a stale source target cannot disclose the previous chat after the scope reset');
 });
 
-function platformFixture(t,{disable,live=false}={}){
- const url='https://miro.com/app/board/uXjVChatUITest=/',workspacePatch={projects:[{id:'alpha',name:'Synthetic course',links:[{id:'board',tool:'miro',title:'Course board',url}]}]},catalog=platformCatalog(workspacePatch),source=catalog[0],doc={id:'miro:'+'a'.repeat(64)+':part0',kind:'miro',service:'miro',source:'Miro',sourceId:source.id,projectId:'alpha',title:'Miro-Aufgabenstellung',text:'PLATFORM_PRIVATE_KNOWLEDGE_MARKER',status:'full',boardURL:url,boardId:'uXjVChatUITest=',itemId:'1001',url:url+'?moveToWidget=1001'},calls=[];let turns=0;
+function platformFixture(t,{disable,live=false,text='PLATFORM_PRIVATE_KNOWLEDGE_MARKER'}={}){
+ const url='https://miro.com/app/board/uXjVChatUITest=/',workspacePatch={projects:[{id:'alpha',name:'Synthetic course',links:[{id:'board',tool:'miro',title:'Course board',url}]}]},catalog=platformCatalog(workspacePatch),source=catalog[0],doc={id:'miro:'+'a'.repeat(64)+':part0',kind:'miro',service:'miro',source:'Miro',sourceId:source.id,projectId:'alpha',title:'Miro-Aufgabenstellung',text,status:'full',boardURL:url,boardId:'uXjVChatUITest=',itemId:'1001',url:url+'?moveToWidget=1001'},calls=[];let turns=0;
  const f=fixture(t,{workspacePatch,platformSources:[doc],onPlatform:async(...args)=>{calls.push(args);return {documents:[doc],result:{results:[{id:doc.id,title:doc.title,text:doc.text,status:'full'}]}};},ai:async message=>{
   if(disable==='platforms')assert.doesNotMatch(JSON.stringify(message.body.messages),/PLATFORM_PRIVATE_KNOWLEDGE_MARKER/);
   return {ok:true,value:{content:JSON.stringify(++turns===1?{type:'tool',tool:'read_platform',args:{sourceId:source.id}}:{type:'answer',text:'Belegt ['+doc.id+']',citations:[doc.id]})}};
@@ -208,4 +208,36 @@ test('campus wait hint switches explicitly, cancels the old run and preserves th
 test('stopping a campus wait removes the hint and never switches providers',async t=>{
  const f=fixture(t,{requestAI:async(provider,action,options={})=>{if(action==='models')return {models:[{id:'synthetic-model'}]};if(action==='usage')return {provider,status:'unknown'};options.onWait({provider,reason:'slow',elapsedMs:15000});return new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Abgebrochen','AbortError')),{once:true}));}});
  await f.ready();f.change('#ki-provider','kiconnect');await settle();f.input('Eine Frage.');f.document.dispatch('submit',f.find('#ki-form'));await settle();assert.match(f.find('.ki-wait-notice').textContent,/Ursache.*unbekannt/);f.click('[data-ki-action="stop"]');await settle();assert.equal(f.view.configuration().provider,'kiconnect');assert.equal(f.document.querySelector('.ki-wait-notice'),null);assert.equal(f.view.isBusy(),false);
+});
+
+test('assistant questions appear as selectable answers; the choice is sent once, as a normal message, and the question is not asked again',async t=>{
+ const prompts=[];let chats=0;
+ const f=fixture(t,{ai:async message=>{chats++;prompts.push(message.body.messages.at(-1).content.split('AKTUELLER NUTZERAUFTRAG:\n').pop());return {ok:true,value:{content:JSON.stringify(chats===1?{type:'tool',tool:'ask_user',args:{question:'Welches Semester meinst du?',options:['WS 2026/27','SS 2026','Älteres Semester'],multiple:true}}:chats===2?{type:'tool',tool:'ask_user',args:{question:'Noch eine Frage?',options:['Ja','Nein']}}:{type:'answer',text:'Gemäß WS 2026/27 gilt die neue Regel.',citations:[]})}};}});
+ await f.ready();f.input('Welche Abgaberegeln gelten?');f.document.dispatch('submit',f.find('#ki-form'));await settle();
+ const form=f.find('[data-ki-clarify]');assert.equal(chats,1);assert.match(f.find('.markdown-content').textContent,/Welches Semester meinst du\?/);
+ const boxes=form.querySelectorAll('input');const choices=boxes.filter(node=>node.getAttribute('name')==='choice');
+ assert.equal(choices.length,3);assert.ok(choices.every(node=>node.getAttribute('type')==='checkbox'));assert.match(form.textContent,/Empfehlung/);assert.match(form.textContent,/Mehrfachauswahl möglich/);
+ // Nothing selected: stays open and says why, without calling the model.
+ f.document.dispatch('submit',form);await settle();assert.equal(chats,1);assert.match(f.find('.ki-clarify-error').textContent,/mindestens eine Option/);
+ choices[0].checked=true;choices[2].checked=true;boxes.find(node=>node.getAttribute('name')==='other').value='nur Prüfungsleistung';
+ f.input('Mein unfertiger Entwurf');
+ f.document.dispatch('submit',f.find('[data-ki-clarify]'));await settle();
+ assert.match(prompts[1],/^Meine Auswahl zu deiner Rückfrage: WS 2026\/27; Älteres Semester; Anderes: nur Prüfungsleistung$/);
+ // The model asked again, but a question right after an answer is refused; the run continues without it.
+ assert.equal(chats,3);assert.match(prompts[2],/Rückfrage ist hier nicht möglich/);
+ assert.equal(f.document.querySelectorAll('[data-ki-clarify]').length,0);assert.match(f.document.body.textContent,/Deine Auswahl: WS 2026\/27; Älteres Semester; Anderes: nur Prüfungsleistung/);assert.match(f.document.body.textContent,/Gemäß WS 2026\/27 gilt die neue Regel/);
+ assert.equal(f.find('#ki-prompt').value,'Mein unfertiger Entwurf','an unsent draft survives answering a question');
+});
+
+test('platform sources show their semester and age so an outdated source cannot pass as current',async t=>{
+ const {f,doc}=platformFixture(t,{text:'Workshop Practical Leadership | 8 April 2020\nAbgabe per Mail'});await f.ready();
+ f.input('Lies die Miro-Aufgabenstellung.');f.document.dispatch('submit',f.find('#ki-form'));await settle();
+ const control=f.document.querySelectorAll('[data-ki-action="source"]').find(node=>node.dataset.id===doc.id);assert(control);
+ assert.match(control.textContent,/SS 2020 · veraltet \(aus dem Text\)/);assert.match(control.querySelector('em').attrs.class,/\bold\b/);
+});
+test('a platform source without any date is shown as undated instead of silently current',async t=>{
+ const {f,doc}=platformFixture(t);await f.ready();
+ f.input('Lies die Miro-Aufgabenstellung.');f.document.dispatch('submit',f.find('#ki-form'));await settle();
+ const control=f.document.querySelectorAll('[data-ki-action="source"]').find(node=>node.dataset.id===doc.id);assert(control);
+ assert.match(control.textContent,/Datum unbekannt/);assert.match(control.querySelector('em').attrs.class,/\bold\b/);
 });
