@@ -35,3 +35,11 @@ export async function readGitlab(op,args,signal){
   if(!response.ok){const error=new Error(typeof value.message==='string'?value.message:'GitLab konnte nicht gelesen werden.');error.code=value.error;throw error;}
   return value;
 }
+
+/** Read-only Mattermost operation for the assistant (teams, search, channel). */
+export async function readMattermost(op,args,signal){
+  const response=await fetch('/api/services/mattermost',{method:'POST',credentials:'same-origin',signal,headers:{'Content-Type':'application/json','X-Context-Request':'service-read'},body:JSON.stringify({op,...args})});
+  let value={};try{value=await response.json();}catch{}
+  if(!response.ok){const error=new Error(typeof value.message==='string'?value.message:'Mattermost konnte nicht gelesen werden.');error.code=value.error;throw error;}
+  return value;
+}

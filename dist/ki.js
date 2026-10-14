@@ -11,7 +11,7 @@ import {spaceBrowserURL} from './spaces.js';
 import {dateKey} from './core.js';
 import {sourceAge} from './source-age.js';
 import {providerSwitchHint} from './provider-hint.js';
-import {loadServiceStatus,readGitlab} from './service-connect.js';
+import {loadServiceStatus,readGitlab,readMattermost} from './service-connect.js';
 import {assessEffort,EFFORT_ACTIONS,NARROW_NOTE,offersSwitch} from './effort.js';
 import {boardSearchChat} from './board-search-history.js';
 import {createSpeechInput,renderSpeechControls} from './speech.js';
@@ -131,9 +131,9 @@ export function createKIView({onChange,onNote,getContext=()=>({workspace:{projec
     finally{changed();}
   }
   function scrollChat(force=false){scrollChatViewport(force);}
-  function sourceButtons(sources){return `<div class="ki-sources">${sources.map(d=>`<button class="ki-source" data-ki-action="source" data-id="${esc(d.id)}" ${state.busy?'disabled':''}><span>${esc(d.kind==='browser'?'Spaces · Browser':d.kind==='photo'?'Foto · lokale Texterkennung':d.kind==='miro'?'Miro':d.kind==='gitlab'?'GitLab · eigenes Konto':d.kind==='service'?({gitlab:'GitLab',sciebo:'Sciebo',mattermost:'Mattermost'})[d.service]||'Kursdienst':KNOWLEDGE_KINDS[d.kind]||'Quelle')} · ${esc(labels[d.status])}</span><strong>${esc(d.title)}</strong>${ageBadge(d)}<small>${d.kind==='browser'?'Original öffnen':'Quellenvorschau öffnen'} ↗</small></button>`).join('')}</div>`;}
+  function sourceButtons(sources){return `<div class="ki-sources">${sources.map(d=>`<button class="ki-source" data-ki-action="source" data-id="${esc(d.id)}" ${state.busy?'disabled':''}><span>${esc(d.kind==='browser'?'Spaces · Browser':d.kind==='photo'?'Foto · lokale Texterkennung':d.kind==='miro'?'Miro':d.kind==='gitlab'?'GitLab · eigenes Konto':d.kind==='mattermost'?'Mattermost':d.kind==='service'?({gitlab:'GitLab',sciebo:'Sciebo',mattermost:'Mattermost'})[d.service]||'Kursdienst':KNOWLEDGE_KINDS[d.kind]||'Quelle')} · ${esc(labels[d.status])}</span><strong>${esc(d.title)}</strong>${ageBadge(d)}<small>${d.kind==='browser'?'Original öffnen':'Quellenvorschau öffnen'} ↗</small></button>`).join('')}</div>`;}
   // Platform sources are often old: show their age so a stale source is never mistaken for a current one.
-  function ageBadge(d){if(!['browser','miro','service','updates'].includes(d.kind))return '';const a=sourceAge(d,dateKey());if(!a)return '';return a.age==='unbekannt'?'<em class="ki-source-age old">Datum unbekannt</em>':`<em class="ki-source-age ${a.age==='aktuell'?'':'old'}">${esc(a.sem)} · ${a.age}${a.basis==='text'?' (aus dem Text)':''}</em>`;}
+  function ageBadge(d){if(!['browser','miro','service','updates','mattermost','gitlab'].includes(d.kind))return '';const a=sourceAge(d,dateKey());if(!a)return '';return a.age==='unbekannt'?'<em class="ki-source-age old">Datum unbekannt</em>':`<em class="ki-source-age ${a.age==='aktuell'?'':'old'}">${esc(a.sem)} · ${a.age}${a.basis==='text'?' (aus dem Text)':''}</em>`;}
   // Screenshots of the board areas an answer is based on: the person can check the claim by eye.
   // The image is data for the person only (see board-shot.js); a click enlarges it.
   const shotTime=value=>{const date=new Date(value);return Number.isFinite(date.getTime())?date.toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}):'';};
@@ -221,7 +221,7 @@ export function createKIView({onChange,onNote,getContext=()=>({workspace:{projec
     state.messages.push({id:crypto.randomUUID(),role:'user',content:prompt,sources:state.attachments,...(ephemeral?{ephemeral:true}:{})});state.attachments=[];state.draft=fromChoice?draftNow:'';state.busy=true;state.error='';state.waitNotice=null;state.switchHint=null;state.steps=[];state.abort=new AbortController();changed();scrollChat(true);
     try{
       // GitLab tools are offered only when the person connected GitLab (token or browser login).
-      let gitlabOn=false;if(state.browserEnabled&&state.enabled.platforms){try{gitlabOn=(await loadServiceStatus()).services?.gitlab?.configured===true;}catch{}}
+      let gitlabOn=false,mattermostOn=false;if(state.browserEnabled&&state.enabled.platforms){try{const connected=(await loadServiceStatus()).services||{};gitlabOn=connected.gitlab?.configured===true;mattermostOn=connected.mattermost?.configured===true;}catch{}}
       const result=await runProjectAgent({prompt,history,documents,projectId:c.projectId,projectName:c.projectName,allowActions:state.allowActions,allowCalendarActions:state.calendarDirect,workspace:c.workspace,sourceStates:c.sources||[],today:dateKey(),allowAsk:!fromChoice,tightBudget:state.provider==='kiconnect',signal:state.abort.signal,
         complete:(messages,signal)=>api('chat',{method:'POST',headers:{'Content-Type':'application/json','X-Context-Request':'ki-request'},signal,body:JSON.stringify({model:state.model,messages})}),
         pageContext:c.pageContext,
@@ -233,6 +233,7 @@ export function createKIView({onChange,onNote,getContext=()=>({workspace:{projec
         }:undefined,
         platform:state.browserEnabled&&state.enabled.platforms&&onPlatform?onPlatform:undefined,
         currentBoard:state.browserEnabled&&state.enabled.platforms&&onCurrentBoard?onCurrentBoard:undefined,
+        mattermost:mattermostOn?(op,args,signal)=>readMattermost(op,args,signal):undefined,
         gitlab:gitlabOn?(op,args,signal)=>readGitlab(op,args,signal):undefined,
         boardShot:state.browserEnabled&&state.enabled.platforms&&onBoardShot?options=>onBoardShot(options):undefined,
         browser:state.browserEnabled&&agentBrowserAvailable()?async(tool,args,signal,scope)=>{

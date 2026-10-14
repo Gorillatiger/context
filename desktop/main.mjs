@@ -197,7 +197,10 @@ await ensureServer();
 await win.loadURL(HUB+'/#today').catch(()=>dialog.showErrorBox('Context-Server starten','Bitte zuerst start.command im context-hub-Ordner starten. Der lokale Server läuft auf Port 4318.'));
 
 async function ensureServer(){try{const response=await fetch(HUB+'/',{signal:AbortSignal.timeout(2000)});if(response.ok)return;}catch{}
- const {createServer}=await import('node:http');const {createRequestHandler}=await import('../server.mjs');const owned=createServer(createRequestHandler(()=>4318,undefined,createKIClient({provider:'kiconnect',credentialStore:desktopKeys.forProvider('kiconnect')}),undefined,undefined,{services:createServiceTokens({stores:{gitlab:desktopKeys.forProvider('gitlab'),mattermost:desktopKeys.forProvider('mattermost')},sessionFetch:Object.fromEntries(['gitlab','mattermost'].map(id=>[id,(url,options)=>providerSession.fetch(url,{...options,credentials:'include'})]))})}));await new Promise((resolve,reject)=>{owned.once('error',error=>error.code==='EADDRINUSE'?resolve():reject(error));owned.listen(4318,'127.0.0.1',resolve);});app.on('before-quit',()=>owned.close());}
+ const {createServer}=await import('node:http');const {createRequestHandler}=await import('../server.mjs');const owned=createServer(createRequestHandler(()=>4318,undefined,createKIClient({provider:'kiconnect',credentialStore:desktopKeys.forProvider('kiconnect')}),undefined,undefined,{services:createServiceTokens({stores:{gitlab:desktopKeys.forProvider('gitlab'),mattermost:desktopKeys.forProvider('mattermost')},sessionFetch:Object.fromEntries(['gitlab','mattermost'].map(id=>[id,async(url,options={})=>{
+   // Mattermost accepts a cookie session's POST (search) only with its CSRF token; it stays in this process.
+   let csrf='';if(id==='mattermost'&&options.method==='POST'){try{csrf=(await providerSession.cookies.get({url:'https://chat.coco.study',name:'MMCSRF'}))[0]?.value||'';}catch{}}
+   return providerSession.fetch(url,{...options,credentials:'include',headers:{...(options.headers||{}),...(csrf?{'X-CSRF-Token':csrf}:{})}});}]))})}));await new Promise((resolve,reject)=>{owned.once('error',error=>error.code==='EADDRINUSE'?resolve():reject(error));owned.listen(4318,'127.0.0.1',resolve);});app.on('before-quit',()=>owned.close());}
 
 app.show();win.show();win.focus();app.focus({steal:true});
 void sessionKeeper.start();

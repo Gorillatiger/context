@@ -176,3 +176,17 @@ test('the GitLab read endpoint needs the session and header, a connected GitLab 
   }finally{await app.close();}
   const none=await serve(null);try{assert.equal((await none.post('/api/services/gitlab',{op:'projects'},{'X-Context-Request':'service-read'})).status,503);}finally{await none.close();}
 });
+
+test('the Mattermost read endpoint uses the saved connection and only its own operations',async()=>{
+  const seen=[],fetcher=async(url,options)=>{seen.push({url:String(url),auth:options.headers?.Authorization,method:options.method});return withHeaders(json(200,String(url).endsWith('/users/me')?{id:'x'.repeat(26)}:[]));};
+  const tokens=createServiceTokens({stores:{mattermost:memoryStore()},env:{},fetcher}),app=await serve(tokens);
+  try{
+    const read=body=>app.post('/api/services/mattermost',body,{'X-Context-Request':'service-read'});
+    assert.equal((await read({op:'teams'})).status,409);
+    await tokens.configure('mattermost',MM);
+    assert.equal((await read({op:'teams',projectId:7})).status,400,'GitLab fields are not accepted here');
+    const ok=await read({op:'teams'});assert.equal(ok.status,200);assert.deepEqual(await ok.json(),{teams:[]});
+    assert.equal(seen.at(-1).auth,'Bearer '+MM);assert.ok(seen.every(call=>call.url.startsWith('https://chat.coco.study/api/v4/')));
+    assert.equal((await read({op:'search',query:'x'})).status,400);
+  }finally{await app.close();}
+});
