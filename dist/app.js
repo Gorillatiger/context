@@ -37,7 +37,7 @@ import {validateLocalAction} from './knowledge.js';
 import {resolveAgentContext} from './agent-context.js';
 import {planCurrentBoard} from './current-board.js';
 import {createFloatingAgent} from './floating-agent.js';
-import {serviceConnectable,serviceConnectHTML,loadServiceStatus,saveServiceToken,forgetServiceToken} from './service-connect.js';
+import {serviceConnectable,serviceConnectHTML,loadServiceStatus,saveServiceToken,forgetServiceToken,connectServiceViaBrowser} from './service-connect.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -299,7 +299,7 @@ function render() {
     <button class="workspace" data-view="settings"><span class="workspace-avatar">C&C</span><span>Dein Arbeitsbereich<small>TH Köln · persönlich</small></span><span class="workspace-chevron">⌄</span></button>
     <p class="nav-label">ARBEITSBEREICH</p>
     <nav aria-label="Arbeitsbereich">${renderNavigation()}</nav>
-    <div class="sidebar-bottom"><button data-view="settings" class="nav-item ${view==='settings'?'active':''}">${icon('settings')}<span>Einstellungen</span></button><div class="profile"><span class="user-avatar">${esc(state.profile.name?state.profile.name.slice(0,1).toUpperCase():'C')}</span><span>${esc(state.profile.name || 'Dein persönlicher Hub')}<small>Code & Context</small></span><span class="version">v0.18.5</span></div></div>
+    <div class="sidebar-bottom"><button data-view="settings" class="nav-item ${view==='settings'?'active':''}">${icon('settings')}<span>Einstellungen</span></button><div class="profile"><span class="user-avatar">${esc(state.profile.name?state.profile.name.slice(0,1).toUpperCase():'C')}</span><span>${esc(state.profile.name || 'Dein persönlicher Hub')}<small>Code & Context</small></span><span class="version">v0.18.6</span></div></div>
   </aside>
   <div class="page-shell"><header class="topbar"><div class="breadcrumb"><button class="mobile-menu icon-button" data-action="menu" aria-label="Navigation öffnen" title="Navigation öffnen">${icon('menu')}</button><strong>${names[view]}</strong></div><label class="course-switch"><span>KURS</span><select id="course-switch" aria-label="Kurs auswählen" ${kiView.isBusy()?'disabled':''}>${courseOptions()}</select></label><button class="search-trigger" data-action="search" aria-label="Arbeitsbereich durchsuchen" title="Arbeitsbereich durchsuchen">${icon('search',17)}<span>Suche</span><kbd>⌘ K</kbd></button><button class="theme-toggle icon-button" type="button" data-action="toggle-theme" data-theme-toggle aria-label="Darkmode aktivieren" aria-pressed="false"><span class="theme-moon" aria-hidden="true">${icon('moon',18)}</span><span class="theme-sun" aria-hidden="true">${icon('sun',18)}</span></button><button class="inbox-trigger icon-button" data-view="inbox" aria-label="Posteingang öffnen${unread?', '+unread+' neue Hinweise':''}">${icon('bell',18)}${unread?'<span class="bell-dot"></span>':''}</button><span class="local-indicator"><span class="tiny-dot ${storageAvailable?'':'warning'}"></span>${storageAvailable?'Lokal gespeichert':'Nicht gespeichert'}</span></header>
   <main id="main" tabindex="-1">${({sources:()=>sourceHub.render(),connections:()=>nangoConnections.render(),boards:()=>boardView.render(),inventory:renderInventory,today:renderToday,calendar:()=>calendarView.render(),companion:()=>companion.render(),browser:()=>browserView.render(),inbox:renderInbox,mail:()=>mailView.render(),projects:renderProjects,tasks:renderTasks,links:renderBookmarks,notes:renderNotes,ai:()=>floatingOpen?heading('DEIN KONTEXTASSISTENT','Chat im Panel','',`<button class="button secondary" data-action="context-agent">${icon('star',17)} Chat hier anzeigen</button>`):kiView.render(),imports:renderImports,plugins:renderPlugins,submissions:renderSubmissions,tools:renderTools,settings:renderSettings}[view])()}</main>
@@ -427,6 +427,10 @@ async function saveServiceForm(form){
   const service=form.dataset.service,token=String(new FormData(form).get('token')||'');form.reset();
   const box=modal.querySelector(`[data-service-connect="${service}"]`);if(box)box.querySelectorAll('button,input').forEach(el=>{el.disabled=true;});
   try{await saveServiceToken(service,token);await renderServiceConnect(service,{message:'Gespeichert. Die Mitteilungen werden jetzt geprüft.'});void refreshFeedAfterServiceChange();}
+  catch(error){await renderServiceConnect(service,{message:error.message,error:true});}
+}
+async function connectServiceSession(service){
+  try{await connectServiceViaBrowser(service);await renderServiceConnect(service,{message:'Verbunden. Die Mitteilungen werden jetzt geprüft.'});void refreshFeedAfterServiceChange();}
   catch(error){await renderServiceConnect(service,{message:error.message,error:true});}
 }
 async function forgetService(service){
@@ -700,6 +704,7 @@ document.addEventListener('click',e=>{
   else if(action==='more-notifications'){inboxLimit+=50;render();}
   else if(action==='connection-help')connectionHelp(id);
   else if(action==='service-forget'&&serviceConnectable(id))void forgetService(id);
+  else if(action==='service-session'&&serviceConnectable(id))void connectServiceSession(id);
   else if(action==='desktop-notifications')toggleDesktopNotifications();
   else if(action==='read-notification'){const n=inboxItems().find(n=>n.id===id);if(!n)return;const key=notificationKey(n);state.inboxRead=state.inboxRead.includes(key)?state.inboxRead.filter(k=>k!==key):[...state.inboxRead,key].slice(-2000);commit();}
   else if(action==='open-notification'){const n=inboxItems().find(n=>n.id===id);if(!n)return;if(n.diaryId)diaryView.open(n.diaryId,n.diaryDate);else if(n.taskId)editTask(n.taskId);else previewNotification(n);}

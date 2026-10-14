@@ -32,3 +32,11 @@ Unter **Mitteilungen → Quellen & Status → GitLab bzw. Mattermost** (oder „
 - **Danach:** Die Mitteilungen werden sofort neu geprüft. TH-Mail wird weiter im Mailbereich eingerichtet, TH-Spaces über die Anmeldung im Context-Browser.
 - **Prüfen:** `npm run test:services:electron` startet die echte Oberfläche mit simulierten Anbieterantworten (falscher Token, richtiger Token, nicht erreichbar, entfernen).
 
+### Ohne Token: über die Browser-Anmeldung lesen
+
+Gibt die Plattform keine persönlichen Tokens frei (z. B. Mattermost bei GitLab-Anmeldung), verbindet „Über meine Browser-Anmeldung verbinden“ die Quelle ohne Token. Voraussetzung ist die Anmeldung bei chat.coco.study bzw. git.coco.study im Context-Browser.
+
+- Die App liest über ihre eigene Browser-Sitzung dieselben lesenden Abrufe wie sonst mit Token (nur GET, feste Adresse, keine Weiterleitungen). Die Cookies bleiben in Electron; Context liest, speichert oder sendet sie nicht.
+- Gespeichert wird nur eine Markierung „Browser-Anmeldung“. Läuft die Sitzung ab, zeigt die Quelle den Fehler; neu anmelden genügt.
+- Ein später eingetragener Token ersetzt diesen Modus, „Verbindung entfernen“ schaltet ihn ab.
+

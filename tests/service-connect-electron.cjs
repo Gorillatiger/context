@@ -29,7 +29,7 @@ app.whenReady().then(async()=>{
   };
   globalThis.fetch=new Proxy(globalThis.fetch,{apply:(target,self,args)=>/^https:\/\/(?:git|chat)\.coco\.study/.test(String(args[0]))?providers(...args):Reflect.apply(target,self,args)});
   let stored='';const store={load:async()=>stored,save:async key=>{stored=key;return true;},clear:async()=>{stored='';}};
-  const services=createServiceTokens({stores:{gitlab:store},env:{},fetcher:providers});
+  let loggedIn=false;const services=createServiceTokens({stores:{gitlab:store},env:{},fetcher:providers,sessionFetch:{mattermost:async()=>loggedIn?answer(200,{id:'abcdefghijklmnopqrstuvwxyz'}):answer(401,{})}});
   const server=http.createServer(createRequestHandler(()=>server.address().port,undefined,undefined,undefined,undefined,{services}));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const win=new BrowserWindow({show:false,width:narrow?420:1180,height:900,webPreferences:{offscreen:true,sandbox:true,contextIsolation:true,nodeIntegration:false}});
@@ -73,6 +73,14 @@ app.whenReady().then(async()=>{
     await waitFor(`!!document.querySelector('#service-token-form')`,'Mattermost form');
     await submit('abcdefghijklmnopqrstuvwxyz');await waitFor(`!!document.querySelector('.service-connect-box .error-message')`,'unreachable message');
     check(await js(`/nicht erreichbar/.test(document.querySelector('.service-connect-box .error-message').textContent)`),'an unreachable provider is reported and nothing is stored');
+    // No token possible (not enabled on the platform): read through the browser login instead.
+    await js(`document.querySelector('[data-action="service-session"]').click()`);
+    await waitFor(`/nicht bei Mattermost angemeldet/.test(document.querySelector('.service-connect-box .error-message')?.textContent||'')`,'logged-out message');
+    loggedIn=true;
+    await js(`document.querySelector('[data-action="service-session"]').click()`);
+    await waitFor(`/Verbunden über deine Anmeldung im Context-Browser/.test(document.querySelector('.service-connect-state')?.textContent||'')`,'connected via the browser login');
+    await waitFor(`!!document.querySelector('[data-action="service-forget"]')`,'remove button in browser-login mode');check(true,'the browser-login mode can be switched off again');
+    await shot('04-browser-login');
     // The overview and TH-Mail offer no token form.
     await js(`document.querySelector('[data-action="close"]').click()`);await sleep(300);
     await js(`document.querySelector('[data-action="connection-help"][data-id="webmail"]').click()`);await sleep(500);

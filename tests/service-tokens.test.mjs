@@ -126,7 +126,7 @@ test('a saved token is used by the next feed collection and a forgotten one is n
     if(target.startsWith('https://git.coco.study')){seen.push(options?.headers?.['PRIVATE-TOKEN']||'');return withHeaders(json(200,target.includes('/user')?{id:7}:[]));}
     return realFetch(url,options);
   };
-  const api=provider(),tokens=createServiceTokens({stores:{gitlab:memoryStore()},env:{},fetcher:api.fetcher}),app=await serve(tokens);
+  const tokens=createServiceTokens({stores:{gitlab:memoryStore()},env:{},fetcher:(url,options)=>globalThis.fetch(url,options)}),app=await serve(tokens);
   try{
     let feed=await (await app.get('/api/notifications')).json();
     assert.equal(feed.sources.find(row=>row.source==='gitlab').status,'not_configured');assert.equal(seen.length,0);
@@ -137,4 +137,24 @@ test('a saved token is used by the next feed collection and a forgotten one is n
     feed=await (await app.get('/api/notifications')).json();
     assert.equal(feed.sources.find(row=>row.source==='gitlab').status,'not_configured');assert.equal(seen.length,0);
   }finally{globalThis.fetch=realFetch;await app.close();await rm(snapshotDir,{recursive:true,force:true});}
+});
+
+test('without a token the app reads through the browser login: checked, stored as a marker, cookies and auth headers never mix',async()=>{
+  const calls=[],sessionFetch={mattermost:async(url,options)=>{calls.push({url:String(url),headers:options.headers});return options.loggedOut?withHeaders(json(401,{})):calls.loggedOut?withHeaders(json(401,{})):withHeaders(json(200,{id:'abcdefghijklmnopqrstuvwxyz'}));}};
+  const store=memoryStore(),api=provider(),tokens=createServiceTokens({stores:{mattermost:store},env:{},fetcher:api.fetcher,sessionFetch});
+  assert.deepEqual(await tokens.configure('mattermost','browser-session'),{configured:true,origin:'browser',storage:'encrypted'});
+  assert.equal(calls[0].url,'https://chat.coco.study/api/v4/users/me');assert.equal(store.value,'browser-session');
+  assert.equal((await tokens.status()).mattermost.origin,'browser');assert.deepEqual(await tokens.overrides(),{MATTERMOST_TOKEN:'browser-session'});
+  // The connector's token header is dropped; the session answers. Other hosts and services keep their normal path.
+  await tokens.fetcher('https://chat.coco.study/api/v4/users/me',{headers:{Authorization:'Bearer browser-session',Accept:'application/json'}});
+  assert.deepEqual(calls.at(-1).headers,{Accept:'application/json'});
+  await tokens.fetcher('https://git.coco.study/api/v4/user',{headers:{'PRIVATE-TOKEN':GOOD}});assert.equal(api.calls.at(-1).headers['PRIVATE-TOKEN'],GOOD);assert.equal(calls.length,2);
+  // After a restart the marker is restored.
+  const again=createServiceTokens({stores:{mattermost:store},env:{},fetcher:api.fetcher,sessionFetch});assert.equal((await again.status()).mattermost.origin,'browser');
+  // Logged out or no desktop app: refused, nothing stored.
+  const out=createServiceTokens({stores:{mattermost:memoryStore()},env:{},sessionFetch:{mattermost:async()=>withHeaders(json(401,{}))}});
+  await assert.rejects(out.configure('mattermost','browser-session'),{code:'not_logged_in'});assert.equal((await out.status()).mattermost.configured,false);
+  await assert.rejects(createServiceTokens({stores:{},env:{}}).configure('mattermost','browser-session'),{code:'not_available'});
+  // A real token replaces the session mode and goes through the normal check.
+  await tokens.configure('mattermost',MM);assert.equal((await tokens.status()).mattermost.origin,'app');
 });

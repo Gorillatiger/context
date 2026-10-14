@@ -41,7 +41,7 @@ export function validHost(host,port) { return host===`127.0.0.1:${port}`||host==
 export function createRequestHandler(portProvider, collect=undefined,ki=defaultKI,mail=defaultMail,openrouter=defaultOpenRouter,{now=Date.now,spaces=null,services=null}={}) {
 const sessionToken=randomBytes(32).toString('hex');
 // GitLab/Mattermost tokens saved in the app (services) take effect for the next collection.
-const collectFeed=collect||(async()=>withSnapshot(await collectNotifications({...process.env,...(services?await services.overrides():{})},{mailClient:defaultMail}),snapshotPath));
+const collectFeed=collect||(async()=>withSnapshot(await collectNotifications({...process.env,...(services?await services.overrides():{})},{mailClient:defaultMail,...(services?.fetcher?{fetcher:services.fetcher}:{})}),snapshotPath));
 let cachedFeed,cachedAt=0,pendingFeed,feedRevision=0;
 async function collectCurrentFeed(){
   // Reconfiguration can finish while a previous account read is pending.
