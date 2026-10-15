@@ -64,6 +64,10 @@ Ist GitLab unter Mitteilungen → Quellen & Status verbunden (Token oder Browser
 
 Ist Mattermost unter Mitteilungen → Quellen & Status verbunden (Token oder Browser-Anmeldung), kann der Assistent: `mattermost_search` (Nachrichten aller deiner Teams durchsuchen, z. B. Ankündigungen zu Abgaben; Mattermost-Suchsyntax wie `in:kanal`, `from:name`, `after:2026-10-01`), `mattermost_teams` (deine Teams und Kanäle, ohne Direktnachrichten) und `mattermost_channel` (letzte 25 Nachrichten eines Kanals). Treffer sind Quellen mit Datum, Semester und Alter, Kanal, Autor und Permalink; der Assistent soll sie mit Spaces, Board und GitLab abgleichen. Nur lesend: die Suche ist technisch ein POST, schreibt aber nichts und ändert keine Lesestände. Bei Browser-Anmeldung braucht Mattermost dafür sein CSRF-Token, das die Desktop-App aus ihrer eigenen Sitzung ergänzt; es verlässt den Prozess nicht. Mit allen Werkzeugen gleichzeitig passen Aufträge bis etwa 3.300 Zeichen; längere bitte kürzen.
 
+## WhatsApp im Assistenten (nur CoCo-Fokus)
+
+Mit dem Schalter „KI-Assistent darf diese Chats lesen“ im CoCo-Fokus (standardmäßig aus) kann der Assistent die dort ausgewählten Chats auf Anfrage lesen (`whatsapp_chats`, `whatsapp_read`): Er öffnet den Chat im offenen WhatsApp-Web-Tab und liest die letzten sichtbaren Nachrichten mit Datum. Antworten dazu tragen Quelle „WhatsApp · lokal gelesen“ mit Alter. Details und Grenzen in `COCO-CHAT-FILTER.md`; der Nachrichtentext geht an das gewählte Modell.
+
 ## Rückfragen und Aktualität (Assistent)
 
 - **Antworten mit Auswahl:** Endet eine Antwort mit einer Frage (welches Repo, welcher Kurs, Link?), liefert das Modell 2–6 Antwortvorschläge mit (`options`); sie erscheinen als Auswahl unter der Antwort. Die Regel ist jetzt „lieber einmal gezielt fragen als falsch raten“, ausdrücklich auch bei unklarem Projekt, Fork, Person oder Abgabe.

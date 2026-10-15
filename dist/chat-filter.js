@@ -8,7 +8,7 @@ export function chatFilterSnapshot(value) {
     if (!row || typeof row.id !== 'string' || !row.id || row.id.length > 300 || /[\u0000-\u001f]/.test(row.id) || typeof row.title !== 'string' || !row.title.trim()) return [];
     return [[row.id, {id:row.id, title:row.title.replace(/[\u0000-\u001f]/g,' ').trim().slice(0,160), identity:row.identity === 'dom' ? 'dom' : 'name'}]];
   })).values()] : [];
-  return {supported:value?.supported === true, enabled:value?.enabled === true, pickerOpen:value?.pickerOpen === true,
+  return {supported:value?.supported === true, assistant:value?.assistant === true, enabled:value?.enabled === true, pickerOpen:value?.pickerOpen === true,
     selected:rows(value?.selected).slice(0,100), chats:rows(value?.chats), warning:typeof value?.warning === 'string' ? value.warning.slice(0,1000) : '',
     storage:value?.storage === 'encrypted' ? 'encrypted' : 'session'};
 }
@@ -35,7 +35,7 @@ export function createChatFilter({bridge = globalThis.window?.contextDesktop, on
   async function refresh() {
     if (!available() || !supported || busy) return;
     const token = epoch; busy = true; error = ''; notify();
-    try { const next = await request({op:'discover'}); if (isCurrent(token)) read(next); }
+    try { const next = await request({op:'discover',sweep:true}); if (isCurrent(token)) read(next); }
     catch (e) { if (isCurrent(token)) error = e.message; }
     finally { if (isCurrent(token)) {busy = false; notify();} }
   }
@@ -78,6 +78,23 @@ export function createChatFilter({bridge = globalThis.window?.contextDesktop, on
     catch (e) {if (isCurrent(token)) error = e.message;}
     finally {if (isCurrent(token)) {busy = false; notify();}}
   }
+  // A chat WhatsApp has not rendered can still be added by its name (same identity the native side derives).
+  const normalizeTitle = value => String(value).normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
+  async function addByName(value) {
+    const title = String(value || '').replace(/[\u0000-\u001f\u007f]/g,' ').trim().replace(/\s+/g,' ').slice(0,160);
+    if (!open || busy || !title) return;
+    if (draft.size >= 100) {error = 'Du kannst bis zu 100 Chats auswählen.'; notify(); return;}
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalizeTitle(title)));
+    const id = 'name:' + Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2,'0')).join('');
+    draft.set(id, {id, title, identity:'name'}); error = ''; search = ''; notify();
+  }
+  async function setAssistant(enabled) {
+    if (!open || busy || !available() || !supported) return;
+    const token = epoch; busy = true; error = ''; notify();
+    try { const next = await request({op:'assistant', enabled:enabled === true}); if (isCurrent(token)) read(next); }
+    catch (e) { if (isCurrent(token)) error = e.message; }
+    finally { if (isCurrent(token)) {busy = false; notify();} }
+  }
   function choices() {return [...new Map([...snapshot.chats,...draft.values()].map(row => [row.id,row])).values()];}
   function renderButton() {
     if (!supported || !available()) return '';
@@ -86,7 +103,7 @@ export function createChatFilter({bridge = globalThis.window?.contextDesktop, on
   function renderPanel() {
     if (!open || !supported) return '';
     const rows = choices().filter(row => row.title.toLocaleLowerCase('de').includes(search.toLocaleLowerCase('de')));
-    return `<aside id="chat-filter-panel" class="cf-panel" aria-label="CoCo-Chat-Auswahl"><div class="cf-toolbar"><div><span class="small-label">NUR IN DIESEM BROWSER</span><h2>Deine CoCo-Chats</h2></div><button type="button" class="icon-button" data-cf-action="close" aria-label="Chat-Auswahl schließen">×</button></div><p class="cf-status">Wähle deine Kurschats und Gruppen. Während der Auswahl siehst du alle WhatsApp-Chats.</p><label class="cf-search" for="cf-search">Chats finden<input id="cf-search" type="search" maxlength="160" placeholder="Kurs oder Chatname …" value="${esc(search)}" autocomplete="off"></label><div class="cf-actions"><button type="button" class="text-link" data-cf-action="refresh" ${busy?'disabled':''}>${busy?'Wird gelesen …':'Aktualisieren'}</button><button type="button" class="text-link" data-cf-action="suggest" ${busy?'disabled':''}>CoCo markieren</button></div><p class="cf-status" role="status">${draft.size} ausgewählt · ${snapshot.chats.length} gefundene Chats</p>${error?`<p class="cf-status cf-error" role="alert">${esc(error)}</p>`:''}<div class="cf-chat-list">${rows.map(row => `<label class="cf-chat-row"><input id="cf-chat-${esc(encodeURIComponent(row.id))}" type="checkbox" data-cf-chat="${esc(row.id)}" ${draft.has(row.id)?'checked':''} ${busy?'disabled':''}><span><strong>${esc(row.title)}</strong><small>${snapshot.chats.some(chat=>chat.id===row.id)?'In diesem Browser gefunden':'Gespeicherte Auswahl'}</small></span></label>`).join('')||`<p class="cf-empty">${busy?'WhatsApp wird geprüft …':search?'Kein passender Chat in der geladenen Liste.':'Scrolle oder suche in WhatsApp und aktualisiere danach diese Liste.'}</p>`}</div>${snapshot.warning?(snapshot.chats.length?`<details class="cf-privacy cf-warning"><summary>Hinweise zur Chat-Zuordnung</summary><p>${esc(snapshot.warning)}</p></details>`:`<p class="cf-status cf-warning">${esc(snapshot.warning)}</p>`):''}<details class="cf-privacy"><summary>Lokaler Filter &amp; Datenschutz</summary><p>${snapshot.storage==='encrypted'?'Deine Auswahl wird verschlüsselt auf diesem Gerät gespeichert.':'Die Auswahl bleibt in dieser Sitzung; verschlüsseltes Speichern ist derzeit nicht verfügbar.'} Für den Filter werden nur Chatnamen und deine Auswahl gelesen. Keine Nachrichtentexte, Bilder oder Übermittlung an die KI. Weitere Chats erscheinen nach Scrollen oder Suchen in WhatsApp.</p></details><div class="cf-actions cf-footer"><button type="button" class="button secondary" data-cf-action="all" ${busy?'disabled':''}>Alle Chats</button><button type="button" class="button primary" data-cf-action="apply" ${busy||!draft.size?'disabled':''}>${busy?'Bitte kurz warten …':'Fokus aktivieren'}</button></div></aside>`;
+    return `<aside id="chat-filter-panel" class="cf-panel" aria-label="CoCo-Chat-Auswahl"><div class="cf-toolbar"><div><span class="small-label">NUR IN DIESEM BROWSER</span><h2>Deine CoCo-Chats</h2></div><button type="button" class="icon-button" data-cf-action="close" aria-label="Chat-Auswahl schließen">×</button></div><p class="cf-status">Wähle deine Kurschats und Gruppen. Während der Auswahl siehst du alle WhatsApp-Chats.</p><label class="cf-search" for="cf-search">Chats finden<input id="cf-search" type="search" maxlength="160" placeholder="Kurs oder Chatname …" value="${esc(search)}" autocomplete="off"></label><form class="cf-add" data-cf-add><label class="cf-search" for="cf-add-name">Chat fehlt? Namen eintragen<input id="cf-add-name" type="text" maxlength="160" placeholder="genauer Name des Chats oder der Gruppe" autocomplete="off"></label><button type="submit" class="text-link" ${busy?'disabled':''}>Hinzufügen</button></form><div class="cf-actions"><button type="button" class="text-link" data-cf-action="refresh" ${busy?'disabled':''}>${busy?'Wird gelesen …':'Alle Chats suchen'}</button><button type="button" class="text-link" data-cf-action="suggest" ${busy?'disabled':''}>CoCo markieren</button></div><p class="cf-status" role="status">${draft.size} ausgewählt · ${snapshot.chats.length} gefundene Chats</p>${error?`<p class="cf-status cf-error" role="alert">${esc(error)}</p>`:''}<div class="cf-chat-list">${rows.map(row => `<label class="cf-chat-row"><input id="cf-chat-${esc(encodeURIComponent(row.id))}" type="checkbox" data-cf-chat="${esc(row.id)}" ${draft.has(row.id)?'checked':''} ${busy?'disabled':''}><span><strong>${esc(row.title)}</strong><small>${snapshot.chats.some(chat=>chat.id===row.id)?'In diesem Browser gefunden':'Gespeicherte Auswahl'}</small></span></label>`).join('')||`<p class="cf-empty">${busy?'WhatsApp wird geprüft …':search?'Kein passender Chat in der geladenen Liste.':'Scrolle oder suche in WhatsApp und aktualisiere danach diese Liste.'}</p>`}</div>${snapshot.warning?(snapshot.chats.length?`<details class="cf-privacy cf-warning"><summary>Hinweise zur Chat-Zuordnung</summary><p>${esc(snapshot.warning)}</p></details>`:`<p class="cf-status cf-warning">${esc(snapshot.warning)}</p>`):''}<label class="cf-assistant"><input type="checkbox" data-cf-assistant ${snapshot.assistant?'checked':''} ${busy?'disabled':''}><span><strong>KI-Assistent darf diese Chats lesen</strong><small>Nur auf deine Anfrage und nur die oben ausgewählten Chats: Der Assistent öffnet den Chat in dieser Ansicht und liest die letzten sichtbaren Nachrichten. Der Text geht an das gewählte KI-Modell, bei Cloud-Modellen also an den Anbieter. Standardmäßig aus.</small></span></label><details class="cf-privacy"><summary>Lokaler Filter &amp; Datenschutz</summary><p>${snapshot.storage==='encrypted'?'Deine Auswahl wird verschlüsselt auf diesem Gerät gespeichert.':'Die Auswahl bleibt in dieser Sitzung; verschlüsseltes Speichern ist derzeit nicht verfügbar.'} Für den Filter werden nur Chatnamen und deine Auswahl gelesen. Nachrichten liest nur der Assistent, und nur wenn du es oben erlaubst. „Alle Chats suchen“ scrollt die Liste einmal durch.</p></details><div class="cf-actions cf-footer"><button type="button" class="button secondary" data-cf-action="all" ${busy?'disabled':''}>Alle Chats</button><button type="button" class="button primary" data-cf-action="apply" ${busy||!draft.size?'disabled':''}>${busy?'Bitte kurz warten …':'Fokus aktivieren'}</button></div></aside>`;
   }
   return {
     renderButton, renderPanel, isOpen:() => open, available,
@@ -126,6 +143,7 @@ export function createChatFilter({bridge = globalThis.window?.contextDesktop, on
       if (checked) draft.set(id,row); else draft.delete(id); error = ''; notify();
     },
     search(value) {search = String(value).slice(0,160); notify();},
+    addByName, setAssistant,
     hide, dispose() {disposed = true; epoch += 1; open = false; void releasePicker(); draft.clear(); snapshot = chatFilterSnapshot();}
   };
 }

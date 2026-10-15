@@ -50,3 +50,18 @@ npm run test:chat-filter:electron
 ```
 
 Der zweite Befehl startet einen eigenen Electron-Testprozess mit frischem temporärem Profil und lokal abgefangener HTTPS-Testseite. Er greift nicht auf das echte WhatsApp-Konto zu und beendet sich nach der Prüfung. In einer Sandbox kann macOS die direkte GUI-Registrierung des Terminalprozesses verweigern; diese Sitzung verwendete deshalb eine separate lokale Test-App, die über die Mac-Oberfläche gestartet wurde. Windows und Linux wurden nicht tatsächlich getestet.
+
+## Chat fehlt? Namen eintragen und „Alle Chats suchen“ (0.18.13)
+
+- **Alle Chats suchen** (vorher „Aktualisieren“) scrollt WhatsApps Chatliste einmal von oben nach unten (höchstens 80 Ausschnitte, acht Sekunden) und merkt sich alle Namen, auch die außerhalb des gerade gerenderten Ausschnitts. Danach steht die Liste wieder an ihrer alten Stelle.
+- **Chat fehlt? Namen eintragen:** Ein Chat, den WhatsApp nicht gerendert hat, lässt sich über seinen genauen Namen hinzufügen. Die Zuordnung läuft über den Namen (wie sonst ohne Chat-ID); beim Öffnen sucht der Fokus ihn in der Liste. Vorher wurden nur bereits gefundene Chats akzeptiert.
+
+## KI-Assistent und CoCo-Fokus-Chats (0.18.13)
+
+Im Auswahlpanel gibt es den Schalter **KI-Assistent darf diese Chats lesen** (standardmäßig aus, verschlüsselt gespeichert). Nur wenn er an ist, gibt der Assistent in einem Chat mit offenem WhatsApp-Web-Tab zwei Werkzeuge frei:
+
+- `whatsapp_chats` listet die freigegebenen Chats.
+- `whatsapp_read {id}` öffnet genau einen davon im Browser und liest die letzten bis zu 40 sichtbaren Nachrichten (je höchstens 600 Zeichen, mit Zeit und Absender). Vorher prüft die App, dass der geöffnete Chat dem ausgewählten Namen entspricht; sonst wird nichts gelesen.
+
+Grenzen und Datenschutz: nur auf Anfrage im Chat und nie automatisch, nur ausgewählte und freigegebene Chats, keine Bilder oder Medien, nichts schreibend und nichts gesendet. Der gelesene Text geht an das gewählte KI-Modell, bei Cloud-Modellen also an den Anbieter, und liegt wie jede zitierte Quelle im lokalen, verschlüsselten Chatarchiv. Beim Lesen öffnet sich der Chat in deiner Ansicht und WhatsApp kann ihn als gelesen markieren. Ältere Nachrichten außerhalb des sichtbaren Ausschnitts fehlen. `npm run test:whatsapp:electron` prüft Suche und Lesen an einer synthetischen WhatsApp-Seite.
+

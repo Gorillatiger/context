@@ -1,6 +1,6 @@
 {
   "name": "coco-context-hub",
-  "version": "0.18.12",
+  "version": "0.18.13",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -23,6 +23,7 @@
     "test:keys:electron": "electron tests/ai-key-store-electron.cjs",
     "test:ki:clarify": "electron tests/ki-clarify-electron.cjs",
     "test:ki:switch": "electron tests/ki-switch-electron.cjs",
+    "test:whatsapp:electron": "electron tests/whatsapp-read-electron.cjs",
     "test:ki:effort": "electron tests/ki-effort-electron.cjs",
     "test:services:electron": "electron tests/service-connect-electron.cjs",
     "test:diary:electron": "electron tests/dev-diary-ui-electron.cjs",

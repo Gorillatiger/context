@@ -320,3 +320,11 @@ input.cf-search::placeholder { color: var(--coco-muted); opacity: 1; }
 .cf-chat-list { min-height: 120px; }
 .cf-privacy { flex: 0 0 auto; margin: 4px 12px; }
 .cf-privacy summary { min-height: 24px; }
+
+/* Add a chat by name; release chats for the assistant */
+.cf-add { display: grid; gap: 6px; margin: 0 0 10px; }
+.cf-add .text-link { justify-self: start; }
+.cf-assistant { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line, #d8d0d3); border-radius: 10px; font-size: 13px; line-height: 1.4; }
+.cf-assistant input[type=checkbox] { width: 18px !important; height: 18px !important; min-height: 0 !important; flex: 0 0 18px !important; margin: 2px 0 0 !important; padding: 0 !important; }
+.cf-assistant span { display: grid; gap: 3px; min-width: 0; }
+.cf-assistant small { font-size: 12px; color: var(--muted, #6b6b6b); }

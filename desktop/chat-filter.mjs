@@ -38,13 +38,14 @@ function selectedEntries(values){
 export function parseChatFilterSnapshot(text){
  if(typeof text!=='string'||Buffer.byteLength(text)>MAX_BYTES)throw fail('BAD_CHAT_STORE','Ungültige lokale Chat-Auswahl.');
  const value=JSON.parse(text);
- if(!value||Array.isArray(value)||value.version!==1||typeof value.enabled!=='boolean'||Object.keys(value).some(key=>!['version','enabled','selected'].includes(key)))throw fail('BAD_CHAT_STORE','Ungültige lokale Chat-Auswahl.');
- return {enabled:value.enabled,selected:selectedEntries(value.selected)};
+ if(!value||Array.isArray(value)||value.version!==1||typeof value.enabled!=='boolean'||Object.keys(value).some(key=>!['version','enabled','selected','assistant'].includes(key))||value.assistant!==undefined&&typeof value.assistant!=='boolean')throw fail('BAD_CHAT_STORE','Ungültige lokale Chat-Auswahl.');
+ return {enabled:value.enabled,selected:selectedEntries(value.selected),assistant:value.assistant===true};
 }
 function request(value){
- const keys={status:['op'],discover:['op'],set:['op','enabled','selected'],picker:['op','open'],open:['op','id']};
+ const keys={status:['op'],discover:['op','sweep'],set:['op','enabled','selected'],picker:['op','open'],open:['op','id'],assistant:['op','enabled'],read:['op','id']};
  if(!value||typeof value!=='object'||Array.isArray(value)||!Object.hasOwn(keys,value.op)||Object.keys(value).some(key=>!keys[value.op].includes(key)))throw fail('BAD_CHAT_REQUEST','Unbekannter Chat-Fokusauftrag.');
  if(value.op==='set'&&(value.enabled!==undefined&&typeof value.enabled!=='boolean'||value.enabled===undefined&&value.selected===undefined))throw fail('BAD_CHAT_REQUEST','Ungültiger Chat-Fokusauftrag.');
+ if(value.op==='discover'&&value.sweep!==undefined&&typeof value.sweep!=='boolean'||value.op==='assistant'&&typeof value.enabled!=='boolean'||value.op==='read'&&typeof value.id!=='string')throw fail('BAD_CHAT_REQUEST','Ungültiger Chat-Fokusauftrag.');
  if(value.op==='picker'&&typeof value.open!=='boolean'||value.op==='open'&&typeof value.id!=='string')throw fail('BAD_CHAT_REQUEST','Ungültiger Chat-Fokusauftrag.');
  if(value.selected!==undefined)selectedEntries(value.selected);
  return value;
@@ -65,6 +66,7 @@ async function chatRuntime(command){
  if(command.op==='configure'&&command.enabled&&!command.pickerOpen&&pane){
   if(!lease||lease.token!==command.lease||lease.cancelled){cancel();lease={token:command.lease,cancelled:false};globalThis[leaseSlot]=lease;}
  }else if(command.op==='open'&&!command.lease&&!lease){lease={token:undefined,cancelled:false};globalThis[leaseSlot]=lease;}
+ else if(command.op==='read'){cancel();lease={token:command.lease,cancelled:false};globalThis[leaseSlot]=lease;}
  const normalize=value=>value.normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
  const nameId=async title=>'name:'+Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalize(title))))).map(byte=>byte.toString(16).padStart(2,'0')).join('');
  const idPattern=/^[0-9]{5,30}(?:-[0-9]{5,30})?@(?:c\.us|s\.whatsapp\.net|g\.us|lid)$/;
@@ -89,7 +91,24 @@ async function chatRuntime(command){
   return {ready:true,chats:[...chats.values()],rows,named,duplicates};
  }
  function publicResult(result){return {ready:result.ready,chats:result.chats,named:result.named||0,duplicates:result.duplicates||0};}
- if(command.op==='discover')return publicResult(await collect());
+ // A sweep scrolls the chat list once from top to bottom (bounded) so chats outside the rendered window are found.
+ async function sweep(){
+  const first=await collect();if(!pane||!pane.isConnected)return first;
+  const height=Number(pane.clientHeight),total=Number(pane.scrollHeight);
+  if(!Number.isFinite(height)||height<1||!Number.isFinite(total)||total<=height)return first;
+  const initialTop=Number(pane.scrollTop)||0,start=Date.now(),merged=new Map(first.chats.map(chat=>[chat.id,chat]));let named=first.named||0,duplicates=first.duplicates||0;
+  try{
+   pane.scrollTop=0;await new Promise(resolve=>setTimeout(resolve,120));
+   for(let step=0;step<80&&Date.now()-start<8000&&merged.size<500;step++){
+    const result=await collect();for(const chat of result.chats)merged.set(chat.id,chat);named=Math.max(named,result.named||0);duplicates=Math.max(duplicates,result.duplicates||0);
+    const top=Number(pane.scrollTop),max=Math.max(0,Number(pane.scrollHeight)-height);if(top>=max-2)break;
+    pane.scrollTop=Math.min(max,top+Math.max(1,Math.floor(height*.8)));await new Promise(resolve=>setTimeout(resolve,120));
+    if(Number(pane.scrollTop)<=top+1)break;
+   }
+  }finally{if(pane.isConnected&&location.origin==='https://web.whatsapp.com')pane.scrollTop=initialTop;}
+  return {ready:true,chats:[...merged.values()].slice(0,500),named,duplicates};
+ }
+ if(command.op==='discover')return publicResult(command.sweep===true?await sweep():await collect());
  async function openChat(id){
   if(!pane||!lease||lease.cancelled||globalThis[leaseSlot]!==lease||command.lease&&command.lease!==lease.token||globalThis[navigationSlot]?.busy)return false;
   const initialTop=Number(pane.scrollTop)||0,start=Date.now();let opened=false,cancelled=false;
@@ -135,6 +154,23 @@ async function chatRuntime(command){
   }
  }
  if(command.op==='open')return {opened:await openChat(command.id)};
+ // Explicit, separate from the focus list: the person allowed the assistant to read this chat. Reads the
+ // visible message text of the chat after verifying that exactly this chat is open. No images, no media.
+ if(command.op==='read'){
+  const opened=await openChat(command.id);if(!opened)return {opened:false,messages:[]};
+  const header=()=>document.querySelector('#main header [data-testid="conversation-info-header-chat-title"],#main header span[dir="auto"][title],#main header span[title]');
+  const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  let title='';for(let i=0;i<30;i++){await wait(150);const node=header();title=(node?.getAttribute('title')||node?.innerText||'').trim();if(title&&normalize(title)===normalize(command.title))break;title='';}
+  if(!title)return {opened:true,verified:false,messages:[]};
+  await wait(600);
+  const nodes=Array.from(document.querySelectorAll('#main [data-pre-plain-text]')).slice(-40),messages=[];
+  for(const node of nodes){
+   const meta=String(node.getAttribute('data-pre-plain-text')||'').replace(/[\u0000-\u001f\u007f]/g,' ').trim().slice(0,120);
+   const body=node.querySelector('span.selectable-text,[data-testid="selectable-text"]'),text=String(body?.innerText||'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'').trim().slice(0,600);
+   if(text)messages.push({meta,text});
+  }
+  return {opened:true,verified:true,title,messages};
+ }
  if(!command.enabled||command.pickerOpen||!pane){cancel();old?.cleanup();delete globalThis[slot];delete globalThis[leaseSlot];return publicResult(await collect());}
  let state=globalThis[slot];
  if(!state){
@@ -167,16 +203,16 @@ export function chatFilterScript(command){return '('+chatRuntime.toString()+')('
 
 export function createDesktopChatFilter({directory,crypto,getActive,emit=()=>{},fs=files,platform=process.platform}){
  const target=path.join(directory,'whatsapp-focus.enc');
- let enabled=false,selected=[],pickerOpen=false,storage='session',storageWarning='',warning='',ready=false,known=new Map(),contextKey='',lease=randomUUID(),attached,executing,insertedCSS,initialization,queue=Promise.resolve(),timer,poll,disposed=false,last='';
+ let enabled=false,assistant=false,selected=[],pickerOpen=false,storage='session',storageWarning='',warning='',ready=false,known=new Map(),contextKey='',lease=randomUUID(),attached,executing,insertedCSS,initialization,queue=Promise.resolve(),timer,poll,disposed=false,last='';
  const current=()=>{const context=getActive();return context&&context.webContents&&!context.webContents.isDestroyed()&&whatsappFilterURL(context.url)?context:null;};
- function snapshot(){const context=current(),same=!!context&&context.id+':'+context.epoch===contextKey;return {supported:!!context,enabled:!!context&&enabled,pickerOpen:!!context&&pickerOpen,selected:context?selected.map(entry=>({...entry})):[],chats:same?[...known.values()]:[],ready:same&&ready,storage,limited:true,warning:context?[storageWarning,warning].filter(Boolean).join(' '):''};}
+ function snapshot(){const context=current(),same=!!context&&context.id+':'+context.epoch===contextKey;return {supported:!!context,assistant:assistant,enabled:!!context&&enabled,pickerOpen:!!context&&pickerOpen,selected:context?selected.map(entry=>({...entry})):[],chats:same?[...known.values()]:[],ready:same&&ready,storage,limited:true,warning:context?[storageWarning,warning].filter(Boolean).join(' '):''};}
  function publish(){if(disposed)return;const value=snapshot(),key=JSON.stringify(value);if(key!==last){last=key;emit(value);}}
  async function available(){if(platform==='linux')return false;return !!await crypto.isAsyncEncryptionAvailable();}
  function initialize(){if(initialization)return initialization;initialization=(async()=>{
   try{
    if(!await available())throw new Error('unavailable');storage='encrypted';
    let buffer;try{const stat=await fs.lstat(target);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>MAX_BYTES+4096)throw new Error('invalid');buffer=await fs.readFile(target);}catch(error){if(error.code!=='ENOENT')throw error;}
-   if(buffer){const decoded=await crypto.decryptStringAsync(buffer),value=parseChatFilterSnapshot(decoded.result);enabled=value.enabled;selected=value.selected;}
+   if(buffer){const decoded=await crypto.decryptStringAsync(buffer),value=parseChatFilterSnapshot(decoded.result);enabled=value.enabled;selected=value.selected;assistant=value.assistant;}
   }catch{storage='session';storageWarning='Die Auswahl gilt für diese Sitzung; verschlüsseltes Speichern ist momentan nicht verfügbar.';}
   publish();return snapshot();
  })();return initialization;}
@@ -184,7 +220,7 @@ export function createDesktopChatFilter({directory,crypto,getActive,emit=()=>{},
   const temporary=path.join(directory,'whatsapp-focus.'+randomUUID()+'.tmp');
   try{
    if(!await available())throw new Error('unavailable');
-   const buffer=await crypto.encryptStringAsync(JSON.stringify({version:1,enabled,selected}));
+   const buffer=await crypto.encryptStringAsync(JSON.stringify({version:1,enabled,selected,assistant}));
    if(!Buffer.isBuffer(buffer)||buffer.length>MAX_BYTES+4096)throw new Error('invalid');
    await fs.mkdir(directory,{recursive:true,mode:0o700});await fs.writeFile(temporary,buffer,{flag:'wx',mode:0o600});await fs.rename(temporary,target);storage='encrypted';storageWarning='';
   }catch{storage='session';storageWarning='Die Auswahl gilt für diese Sitzung; verschlüsseltes Speichern ist momentan nicht verfügbar.';}
@@ -204,18 +240,18 @@ export function createDesktopChatFilter({directory,crypto,getActive,emit=()=>{},
   await removeCSS();assertCurrent(context);
   const key=await context.webContents.insertCSS(CHAT_FILTER_CSS,{cssOrigin:'user'});insertedCSS={key,context};assertCurrent(context);
  }
- async function execute(context,command){
+ async function execute(context,command,limit=11000){
   assertCurrent(context);
   if(disposed)throw fail('CHAT_FILTER_CLOSED','Der Chat-Fokus wird geschlossen.');
   executing=context;let timeout;
   try{
    const pending=context.webContents.executeJavaScriptInIsolatedWorld(1002,[{code:chatFilterScript({...command,lease})}]);
-   const result=await Promise.race([pending,new Promise((_,reject)=>{timeout=setTimeout(()=>{cancelRuntime();reject(fail('CHAT_TIMEOUT','Die WhatsApp-Suche dauert zu lange. Bitte die normale Suche benutzen.'));},11000);timeout.unref?.();})]);
+   const result=await Promise.race([pending,new Promise((_,reject)=>{timeout=setTimeout(()=>{cancelRuntime();reject(fail('CHAT_TIMEOUT','Die WhatsApp-Suche dauert zu lange. Bitte die normale Suche benutzen.'));},limit);timeout.unref?.();})]);
    assertCurrent(context);return result;
   }finally{clearTimeout(timeout);if(executing===context)executing=null;}
  }
  function accept(result){
-  if(!result||!Array.isArray(result.chats)||result.chats.length>200)throw fail('BAD_CHAT_DOM','Die WhatsApp-Chatliste konnte nicht sicher gelesen werden.');
+  if(!result||!Array.isArray(result.chats)||result.chats.length>500)throw fail('BAD_CHAT_DOM','Die WhatsApp-Chatliste konnte nicht sicher gelesen werden.');
   for(const raw of result.chats){const entry=chatEntry(raw);if(!known.has(entry.id)&&known.size>=MAX_CHATS)continue;known.set(entry.id,entry);}
   ready=result.ready===true;
   warning=!ready?'Öffne und entsperre WhatsApps Chatliste.':result.named>0||selected.some(entry=>entry.identity==='name')?'Zuordnung über sichtbare Chatnamen: gleiche Namen werden zusammengefasst; nach Umbenennen bitte neu auswählen.':'';
@@ -246,14 +282,27 @@ export function createDesktopChatFilter({directory,crypto,getActive,emit=()=>{},
    if(message.op==='status')return refresh();
    if(!current())throw fail('CHAT_NOT_SUPPORTED','Öffne WhatsApp Web im aktiven Context-Browser-Tab.');
    await refresh();
-   if(message.op==='discover')return refresh(true);
+   if(message.op==='discover'){
+    if(message.sweep){try{accept(await execute(current(),{op:'discover',sweep:true},20000));}catch(error){warning=error.code==='CHAT_TIMEOUT'?error.message:warning;}publish();return snapshot();}
+    return refresh(true);
+   }
+   if(message.op==='assistant'){assistant=message.enabled;await persist();publish();return snapshot();}
+   if(message.op==='read'){
+    // The assistant may read only chats the person selected AND explicitly released for it.
+    if(!assistant)throw fail('ASSISTANT_NOT_ALLOWED','Du hast dem Assistenten das Lesen deiner CoCo-Chats nicht erlaubt. Schalte es im CoCo-Fokus ein.');
+    const entry=selected.find(item=>item.id===message.id);if(!entry)throw fail('BAD_CHAT_SELECTION','Dieser Chat gehört nicht zu deinem CoCo-Fokus.');
+    lease=randomUUID();
+    const result=await execute(current(),{op:'read',id:entry.id,title:entry.title},24000);
+    if(!result||typeof result!=='object'||!Array.isArray(result.messages)||result.messages.length>40||result.messages.some(m=>!m||typeof m.text!=='string'||m.text.length>600||typeof m.meta!=='string'||m.meta.length>120))throw fail('BAD_CHAT_DOM','Die WhatsApp-Nachrichten konnten nicht sicher gelesen werden.');
+    return {...snapshot(),read:{opened:result.opened===true,verified:result.verified===true,title:entry.title,messages:result.messages.map(m=>({meta:m.meta,text:m.text}))}};
+   }
    if(message.op==='picker'){lease=randomUUID();pickerOpen=message.open;return refresh(true);}
    if(message.op==='open'){
     if(!selected.some(entry=>entry.id===message.id))throw fail('BAD_CHAT_SELECTION','Wähle diesen Chat zuerst für deinen CoCo-Fokus aus.');
     const result=await execute(current(),{op:'open',id:message.id});return {...snapshot(),opened:result?.opened===true};
    }
    lease=randomUUID();
-   if(message.selected!==undefined){const next=selectedEntries(message.selected);selected=next.map(entry=>{const existing=known.get(entry.id)||selected.find(saved=>saved.id===entry.id);if(!existing)throw fail('CHAT_NOT_DISCOVERED','Dieser Chat wurde noch nicht in der gerenderten WhatsApp-Liste gefunden.');return {...existing};});}
+   if(message.selected!==undefined){const next=selectedEntries(message.selected);selected=next.map(entry=>{const existing=known.get(entry.id)||selected.find(saved=>saved.id===entry.id);if(!existing){if(entry.identity==='name')return {...entry};throw fail('CHAT_NOT_DISCOVERED','Dieser Chat wurde noch nicht in der gerenderten WhatsApp-Liste gefunden.');}return {...existing};});}
    if(message.enabled!==undefined)enabled=message.enabled;
    pickerOpen=false;await persist();return refresh(true);
   });

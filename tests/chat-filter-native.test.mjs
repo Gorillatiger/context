@@ -158,7 +158,6 @@ test('native requests reject unobserved chats, invalid IDs and arbitrary paths/o
  const f=await fixture(t);
  for(const value of [{op:'execute',code:'alert(1)'},{op:'picker',open:'yes'},{op:'status',path:'/etc/passwd'},{op:'set',enabled:'yes'},null])await assert.rejects(f.filter.handle(value),{code:'BAD_CHAT_REQUEST'});
  await assert.rejects(f.filter.handle({op:'set',selected:[{id:'name:invalid',title:'CoCo'}]}),{code:'BAD_CHAT_SELECTION'});
- await assert.rejects(f.filter.handle({op:'set',selected:[{id:namedChatId('Unknown'),title:'Unknown'}]}),{code:'CHAT_NOT_DISCOVERED'});
  await assert.rejects(f.filter.handle({op:'open',id:namedChatId('CoCo Team')}),{code:'BAD_CHAT_SELECTION'});
  assert.equal(f.dom.clicks.length,0);assert.deepEqual(await readdir(f.directory),[]);
 });
@@ -186,4 +185,26 @@ test('the bridge retains the trusted main-frame guard and DOM script contains no
  for(const event of [{sender:{},senderFrame:frame},{sender:webContents,senderFrame:{url:frame.url}}])assert.throws(()=>trusted(event),/Zugriff/);
  const script=chatFilterScript({op:'discover'});assert.doesNotMatch(script,/fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|\.innerHTML|\.textContent\s*[;)]|\.src\b|window\.Store|__react|display\s*:\s*none|visibility\s*:\s*hidden/);
  assert.match(script,/document\.querySelector\('#pane-side'\)/);assert.match(script,/getAttribute\('title'\)/);
+});
+
+test('a chat can be added by its name even if WhatsApp has not rendered it; foreign ids still need discovery',async t=>{
+ const f=await fixture(t);
+ const added=await f.filter.handle({op:'set',enabled:true,selected:[{id:namedChatId('Users and Situated Action'),title:'Users and Situated Action'}]});
+ assert.deepEqual(added.selected.map(row=>[row.title,row.identity]),[['Users and Situated Action','name']]);
+ await assert.rejects(f.filter.handle({op:'set',selected:[{id:'dom:491234567890@g.us',title:'Nie gesehen'}]}),{code:'CHAT_NOT_DISCOVERED'});
+});
+
+test('the assistant may read only chats that are selected and explicitly released, and the release is stored',async t=>{
+ const f=await fixture(t);const found=await f.filter.handle({op:'discover'}),chat=found.chats[0];
+ await assert.rejects(f.filter.handle({op:'read',id:chat.id}),{code:'ASSISTANT_NOT_ALLOWED'});
+ await f.filter.handle({op:'set',enabled:true,selected:[chat]});
+ await assert.rejects(f.filter.handle({op:'read',id:chat.id}),{code:'ASSISTANT_NOT_ALLOWED'},'selected alone is not a release');
+ assert.equal((await f.filter.handle({op:'assistant',enabled:true})).assistant,true);
+ await assert.rejects(f.filter.handle({op:'read',id:namedChatId('Private Familie')}),{code:'BAD_CHAT_SELECTION'},'unselected chats stay closed');
+ for(const bad of [{op:'assistant'},{op:'assistant',enabled:'yes'},{op:'read'},{op:'read',id:7},{op:'read',id:chat.id,limit:5},{op:'discover',sweep:'yes'}])await assert.rejects(f.filter.handle(bad),{code:'BAD_CHAT_REQUEST'},JSON.stringify(bad));
+ await f.filter.flush();
+ assert.equal(parseChatFilterSnapshot(JSON.stringify({version:1,enabled:true,selected:[{id:chat.id,title:chat.title}],assistant:true})).assistant,true);
+ assert.equal(parseChatFilterSnapshot(JSON.stringify({version:1,enabled:true,selected:[]})).assistant,false);
+ assert.throws(()=>parseChatFilterSnapshot(JSON.stringify({version:1,enabled:true,selected:[],assistant:'yes'})),{code:'BAD_CHAT_STORE'});
+ assert.equal((await f.filter.handle({op:'assistant',enabled:false})).assistant,false);
 });

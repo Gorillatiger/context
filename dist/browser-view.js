@@ -115,7 +115,14 @@ export function createBrowserView({ onChange, onOpen, onError }) {
     void send({ type: "navigate", id: state.active, url: value });
   });
   document.addEventListener('input', event => {if (event.target.id === 'cf-search') chatFilter.search(event.target.value);});
-  document.addEventListener('change', event => {if (event.target.matches('[data-cf-chat]')) chatFilter.change(event.target.dataset.cfChat, event.target.checked);});
+  document.addEventListener('change', event => {
+    if (event.target.matches('[data-cf-chat]')) chatFilter.change(event.target.dataset.cfChat, event.target.checked);
+    if (event.target.matches('[data-cf-assistant]')) void chatFilter.setAssistant(event.target.checked);
+  });
+  document.addEventListener('submit', event => {
+    if (!event.target.matches?.('[data-cf-add]')) return;
+    event.preventDefault(); void chatFilter.addByName(event.target.elements['cf-add-name']?.value ?? new FormData(event.target).get('cf-add-name') ?? event.target.querySelector('input')?.value);
+  });
   document.addEventListener("click", (event) => {
     const filterButton = event.target.closest('[data-cf-action]');
     if (filterButton) {
