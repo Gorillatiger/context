@@ -40,7 +40,10 @@ app.whenReady().then(async()=>{
       await sleep(700);
     }
     await waitFor(`!!document.querySelector('[data-ki-clarify]')`,'question with choices');
+    // Hostile global rule: choices must keep their own size (reported: radio fills the row, text pushed aside).
+    await js(`(()=>{const st=document.createElement('style');st.textContent='input{width:100%;height:80px;padding:20px}';document.head.append(st);})()`);
     const form=await js(`(()=>{const f=document.querySelector('[data-ki-clarify]'),r=f.getBoundingClientRect(),inputs=[...f.querySelectorAll('input[name=choice]')];return {types:inputs.map(i=>i.type),labels:[...f.querySelectorAll('.ki-clarify-option')].map(l=>l.textContent.trim()),legend:f.querySelector('legend').textContent,width:r.width,visible:r.width>0&&r.height>0,disabled:f.querySelector('fieldset').disabled,text:f.closest('.ki-message').textContent.slice(0,300)};})()`);
+    check(await js(`[...document.querySelectorAll('[data-ki-clarify] input[name=choice]')].every(i=>i.getBoundingClientRect().width<=24&&i.getBoundingClientRect().height<=24)&&[...document.querySelectorAll('.ki-clarify-option > span')].every(s=>s.getBoundingClientRect().width>120)`),'choice inputs keep their size and the text keeps its room even under a hostile global input rule');
     check(form.visible&&form.types.length===3&&form.types.every(type=>type==='checkbox'),'three checkboxes are rendered and visible');
     check(/Empfehlung/.test(form.labels[0])&&/Mehrfachauswahl/.test(form.legend),'first option is marked as recommendation, multiple choice is announced');
     check(/Für welches Semester/.test(form.text)&&!form.disabled,'the question is shown and the form is usable');

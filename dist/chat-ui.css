@@ -196,3 +196,10 @@ body.ai-active .context-agent-launcher { display: none; }
 .ki-chat .ki-login { display: grid; gap: 8px; margin: 10px 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--coco-paper); }
 .ki-chat .ki-login-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; font-size: 13px; line-height: 1.4; }
 .ki-chat .ki-login .button.primary { justify-self: start; }
+
+/* Answer choices must never stretch: a global input width made the radio/checkbox fill the row and push the text aside. */
+.ki-chat .ki-clarify-option input[type=radio],
+.ki-chat .ki-clarify-option input[type=checkbox],
+.ki-clarify-option input[type=radio],
+.ki-clarify-option input[type=checkbox] { width: 18px !important; height: 18px !important; min-width: 18px; min-height: 0 !important; flex: 0 0 18px !important; margin: 2px 0 0 !important; padding: 0 !important; }
+.ki-clarify-option > span { flex: 1 1 auto; min-width: 0; }
