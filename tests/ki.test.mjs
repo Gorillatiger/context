@@ -84,6 +84,11 @@ test('KI enforces a bounded request rate and recovers after the window',async()=
   time=60001;assert.equal((await client.complete(input)).content,'Antwort');
 });
 
+test('OpenRouter is not throttled locally; the per-minute limit is specific to KI:connect',async()=>{
+  const client=createKIClient({provider:'openrouter',getKey:auth,now:()=>0,fetcher:async(url)=>url.endsWith('/models')?models():completion()});
+  for(let i=0;i<25;i++)assert.equal((await client.complete(input)).content,'Antwort');
+});
+
 test('KI connection setup validates the key before retaining it in server memory and never returns it',async()=>{
   const sent=[];
   const client=createKIClient({getKey:async()=>null,fetcher:async(url,options)=>{

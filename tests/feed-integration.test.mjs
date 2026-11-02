@@ -1,3 +1,4 @@
+import {readUnifiedFeed} from '../dist/platform-feed.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -69,7 +70,7 @@ function readerFixture({fetch,previous=[notice('before')],notifications=true}={}
   assert.ok(changeStart>=0&&changeEnd>changeStart);
   const effects={renders:0,search:0,companion:0,toasts:[],notifications:[],timers:[],refreshRequests:0};
   function Notification(title,options){effects.notifications.push({title,...options});}Notification.permission='granted';
-  const context={fetch,AbortSignal,DOMException,parseFeedSnapshot,notificationKey,feedBusy:false,feedEpoch:0,feedNeedsRefresh:false,remoteItems:previous,sourceStates:[{source:'webmail',status:'connected'},{source:'gitlab',status:'connected'}],hasLocalConnector:true,feedLastError:'',feedCheckedAt:'',view:'inbox',modal:{open:false},searchModal:{open:false},state:{projects:[],notificationSettings:{desktop:notifications}},seenRemoteIds:new Set(previous.map(notificationKey)),initialFeed:false,Notification,window:{Notification},render:()=>effects.renders++,invalidateSearch:()=>effects.search++,companion:{update:()=>effects.companion++},toast:value=>effects.toasts.push(value),setTimeout:callback=>effects.timers.push(callback),refreshFeed:()=>effects.refreshRequests++};
+  const context={readUnifiedFeed:options=>readUnifiedFeed({...options,fetcher:fetch,bridge:null}),fetch,AbortSignal,DOMException,parseFeedSnapshot,notificationKey,feedBusy:false,feedEpoch:0,feedNeedsRefresh:false,remoteItems:previous,sourceStates:[{source:'webmail',status:'connected'},{source:'gitlab',status:'connected'}],hasLocalConnector:true,feedLastError:'',feedCheckedAt:'',view:'inbox',modal:{open:false},searchModal:{open:false},state:{projects:[],notificationSettings:{desktop:notifications}},seenRemoteIds:new Set(previous.map(notificationKey)),initialFeed:false,Notification,window:{Notification},render:()=>effects.renders++,invalidateSearch:()=>effects.search++,companion:{update:()=>effects.companion++},toast:value=>effects.toasts.push(value),setTimeout:callback=>effects.timers.push(callback),refreshFeed:()=>effects.refreshRequests++};
   vm.createContext(context);vm.runInContext(app.slice(changeStart,changeEnd)+'\n'+app.slice(start,end),context);
   return {read:options=>context.readFeed(options),change:(service,detail)=>context.mailConnectionChanged(service,detail),context,effects};
 }

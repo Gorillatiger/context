@@ -258,5 +258,5 @@ export function createDesktopChatFilter({directory,crypto,getActive,emit=()=>{},
    pickerOpen=false;await persist();return refresh(true);
   });
  }
- return Object.freeze({initialize,handle,schedule,flush:()=>queue,dispose:async()=>{disposed=true;clearTimeout(timer);clearTimeout(poll);cancelRuntime();await queue;await cleanup();}});
+ return Object.freeze({initialize,handle,schedule,notificationSelection:()=>enabled?selected.map(entry=>({...entry})):[],flush:()=>queue,dispose:async()=>{disposed=true;clearTimeout(timer);clearTimeout(poll);cancelRuntime();await queue;await cleanup();}});
 }

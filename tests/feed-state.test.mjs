@@ -26,3 +26,9 @@ test('retained failed rows stay inside the 2200-entry bound',()=>{
   const rows=Array.from({length:2200},(_,i)=>row('new'+i));
   assert.equal(parseFeedSnapshot(feed(rows,[{source:'mattermost',status:'error'}]),[row('old')]).items.length,2200);
 });
+test('an authoritative native failure cannot restore rows removed after a per-scope permission denial',()=>{
+  const old=[row('revoked'),row('network')],kept=row('network','mattermost',{stale:true});
+  const result=parseFeedSnapshot(feed([kept],[{source:'mattermost',status:'error',itemsAuthoritative:true}]),old);
+  assert.deepEqual(result.items.map(item=>item.id),['network']);
+  assert.deepEqual(parseFeedSnapshot(feed([],[{source:'mattermost',status:'error',itemsAuthoritative:true}]),old).items,[]);
+});

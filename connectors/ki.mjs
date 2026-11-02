@@ -36,6 +36,8 @@ async function limitedJSON(response,limit=1000000){
 export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Date.now}={}){
   if(!Object.hasOwn(AI_PROVIDERS,provider))throw new KIError(400,'invalid_provider','Unbekannter KI-Anbieter.');
   const config=AI_PROVIDERS[provider],name=config.name;
+  // Only the university service has a per-minute quota; OpenRouter is bounded by the key budget.
+  const throttled=provider==='kiconnect';
   getKey||=provider==='kiconnect'?readKIKey:()=>readKIKey({KICONNECT_API_KEY:process.env.OPENROUTER_API_KEY});
   let cachedModels=null,cachedKey='',cachedAt=0,active=false,sessionCredential=null;
   let usageCache=null,usagePending=null,usageRevision=0;
@@ -111,9 +113,9 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
     async configure(value){
       if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>k!=='key')||typeof value.key!=='string'||!value.key.trim()||value.key.length>4096||/[\r\n]/.test(value.key))throw new KIError(400,'invalid_key','Bitte einen gültigen API-Schlüssel eingeben.');
       if(active)throw new KIError(429,'busy','Eine KI-Anfrage läuft bereits. Bitte kurz warten.');
-      requests=requests.filter(at=>now()-at<60000);
-      if(requests.length>=10)throw new KIError(429,'local_limit','Bitte kurz warten. Höchstens zehn KI-Anfragen pro Minute.');
-      active=true;requests.push(now());
+      if(throttled){requests=requests.filter(at=>now()-at<60000);
+      if(requests.length>=10)throw new KIError(429,'local_limit','Bitte kurz warten. Höchstens zehn KI-Anfragen pro Minute.');}
+      active=true;if(throttled)requests.push(now());
       try{
         const auth={key:value.key.trim(),storage:'session'};
         if(provider==='openrouter'){
@@ -130,13 +132,13 @@ export function createKIClient({provider='kiconnect',getKey,fetcher=fetch,now=Da
     async complete(value,signal){
       const input=validateChat(value);
       if(active)throw new KIError(429,'busy','Eine KI-Anfrage läuft bereits. Bitte kurz warten.');
-      requests=requests.filter(at=>now()-at<60000);
-      if(requests.length>=10)throw new KIError(429,'local_limit','Bitte kurz warten. Höchstens zehn KI-Anfragen pro Minute.');
+      if(throttled){requests=requests.filter(at=>now()-at<60000);
+      if(requests.length>=10)throw new KIError(429,'local_limit','Bitte kurz warten. Höchstens zehn KI-Anfragen pro Minute.');}
       active=true;
       try{
         const auth=await credential();const models=await modelsWithKey(auth,signal);
         if(!models.some(m=>m.id===input.model))throw new KIError(400,'unknown_model','Dieses Modell ist nicht in deiner '+name+'-Modellliste.');
-        requests.push(now());
+        if(throttled)requests.push(now());
         const result=await request('/chat/completions',auth.key,{...input,stream:false,...(provider==='openrouter'?{max_tokens:3000,provider:{data_collection:'deny',zdr:true}}:{})},signal);
         const content=result.choices?.[0]?.message?.content;
         if(typeof content!=='string'||!content.trim()||content.length>50000)throw new KIError(502,'invalid_completion','Die KI hat keine verwendbare Textantwort geliefert.');

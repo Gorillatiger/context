@@ -27,3 +27,7 @@ Echte Browserbedienung des Produktionsrenderers und der Connector-/IPC-Funktione
 Installierte App weiter 0.17.0 und laufend; Update erst nach regulärem Speichern/Beenden aktivieren. Der bestehende Dienst 4318 wurde nicht neu gestartet. Keine Browser-Cookies/Profile kopiert. [Prüfbericht](ai-usage-qa.json).
 
 Quellen, geprüft am 14.10.2026: [OpenRouter-Limits](https://openrouter.ai/docs/api/reference/limits), [aktueller Schlüssel](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key), [Kontoguthaben und Management-Key](https://openrouter.ai/docs/api/api-reference/credits/get-remaining-credits), [KI:connect-API](https://chat.kiconnect.nrw/app/api-docs/), [KI:connect-Nutzungsregeln des Betreibers](https://help.itc.rwth-aachen.de/en/service/1808737e10424937b76e564ed15d8028/article/4f07ebbbc8c4477a8db9baa441494941/).
+
+## Wechsel-Hinweis bei Hochschul-KI
+
+Scheitert eine Anfrage bei KI:connect NRW, weil sie zu groß ist, zu lange dauert oder ein Limit greift (Chat zu lang, Anfrage oder Antwort zu groß, Zeitüberschreitung, erreichtes Limit, zehn Anfragen pro Minute), zeigt die Fehlermeldung zwei Buttons: **Zu OpenRouter wechseln** und **Zu Lokales Modell wechseln**. Der Wechsel geschieht nie automatisch, weil Kursinhalte sonst an einen anderen Anbieter gingen. Dein Text steht nach dem Wechsel als Entwurf bereit. Die Prüfung liegt in `dist/provider-hint.js`; die Fehlercodes werden dafür von `dist/ai-client.js` weitergereicht. Das Zehn-pro-Minute-Limit gilt nur für KI:connect, nicht für OpenRouter.

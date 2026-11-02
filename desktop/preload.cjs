@@ -1,6 +1,8 @@
 const {contextBridge,ipcRenderer}=require('electron');
 // No raw IPC/event object is exposed, and remote pages never receive this preload.
 contextBridge.exposeInMainWorld('contextDesktop',Object.freeze({
+  notificationSyncVersion:1,
+  notifications:message=>ipcRenderer.invoke('context:notifications',message),
   boardScan:true,
   boardScanVersion:2,
   inventoryBrowser:true,

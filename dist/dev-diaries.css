@@ -19,3 +19,18 @@ dialog.dev-diary-modal.beside-browser{inset:20px 0 auto;margin:0 auto;max-width:
 .dd-setup .form-footer{position:sticky;bottom:-24px;z-index:2;background:var(--coco-white);padding:16px 0;margin-bottom:-8px}
 @media(min-width:900px){.dd-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}.dd-day{justify-content:space-between}}
 @media(max-width:580px){dialog.dev-diary-modal{width:calc(100vw - 20px);padding:18px;max-height:calc(100dvh - 20px)}.dev-diary-modal .modal-head{top:-18px}.dd-setup .form-footer{bottom:-18px;gap:12px;flex-wrap:wrap}}
+/* Kurs-Timeline als Kalender */
+.dd-calendar{display:grid;gap:10px;margin:14px 0}
+.dd-cal-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}.dd-cal-head span{color:var(--muted);font-size:13px}
+.dd-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dd-cal-dow{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}
+.dd-cal-cell{min-height:84px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--surface,transparent);text-align:left;display:grid;align-content:start;gap:4px;overflow:hidden;font:inherit;color:inherit}
+.dd-cal-cell.outside{border-color:transparent;background:transparent}
+button.dd-cal-cell{cursor:pointer}button.dd-cal-cell:hover{background:var(--sage)}
+.dd-cal-cell.selected{outline:2px solid var(--accent);outline-offset:-2px}.dd-cal-cell.today .dd-cal-date{color:var(--accent);font-weight:700}
+.dd-cal-date{display:flex;justify-content:space-between;font-size:12px;font-weight:600}.dd-cal-state{color:var(--accent)}
+.dd-cal-cell ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-size:11px;line-height:1.25}
+.dd-cal-cell li{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:6px;border-left:2px solid var(--accent)}
+.dd-cal-cell li.task{border-left-color:var(--muted)}.dd-cal-cell li.done{text-decoration:line-through;opacity:.6}.dd-cal-cell li.more{border:0;color:var(--muted)}
+.dd-cal-cell time{font-variant-numeric:tabular-nums;opacity:.7}
+@media(max-width:700px){.dd-cal-cell{min-height:56px;padding:4px}.dd-cal-cell li{font-size:10px}}

@@ -20,7 +20,7 @@ function findingTitle(link,source,sourceTitle,url) {
  const context=[sourceTitle,plain(source.projectTitle)].find(usefulReference);
  return context?{title:plain('Board · '+context),titleOrigin:'reference'}:{title:'Miro-Board',titleOrigin:'unknown'};
 }
-const titleRank = origin => ({unknown:0,reference:1,link:2,custom:3})[origin]??0;
+const titleRank = origin => ({unknown:0,reference:1,link:2,miro:3,custom:4})[origin]??0;
 function titleStrength(value) {
  const words=normalizedLabel(value).split(' ').filter(word=>word&&!labelWords.has(word)&&!/^\d+$/.test(word));
  return new Set(words).size*1000+Math.min(plain(value).length,500);
@@ -52,7 +52,7 @@ const stamp=v=>{
 const sourceKey=v=>{if(typeof v!=='string'||!v.trim())throw new Error('Fundstellen-Kennung fehlt.');v=v.trim();v=/^https:\/\//i.test(v)?boardSourceURL(v):v;if(v.length>200)throw new Error('Fundstellen-Kennung ist zu lang.');return v;};
 export function boardFinding(link,source,now=new Date().toISOString()){
  const url=miroBoardURL(link.url),sourceId=sourceKey(source.id),projectId=str(source.projectId,80),originProjectId=str(link.originProjectId??source.projectId,80),sourceURL=boardSourceURL(link.sourceURL||source.url||''),sourceTitle=plain(link.sourceTitle||source.title)||'Gespeicherte Quelle';
- return {id:url+'|'+sourceId+'|'+originProjectId,url,...findingTitle(link,source,sourceTitle,url),sourceId,sourceTitle,sourceURL,sourceKind:str(source.kind,40)||'local',projectId,originProjectId,postedBy:plain(link.postedBy||source.postedBy),postedAt:stamp(link.postedAt||source.postedAt),foundAt:stamp(now),customTitle:'',assignedProjectId:null};
+ return {id:url+'|'+sourceId+'|'+originProjectId,url,...findingTitle(link,source,sourceTitle,url),sourceId,sourceTitle,sourceURL,sourceKind:str(source.kind,40)||'local',projectId,originProjectId,postedBy:plain(link.postedBy||source.postedBy),postedAt:stamp(link.postedAt||source.postedAt),foundAt:stamp(now),customTitle:'',assignedProjectId:null,miroTitle:plain(link.miroTitle).slice(0,240),miroOwner:plain(link.miroOwner).slice(0,200),miroCheckedAt:stamp(link.miroCheckedAt)};
 }
 export function extractBoardLinks(value){
  const input=typeof value==='string'?value.slice(0,200000):'',found=new Map();
@@ -61,6 +61,19 @@ export function extractBoardLinks(value){
  for(const m of input.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi))add(m[1],m[2]);
  for(const m of input.matchAll(/https:\/\/[^\s<>"'\])]+/g))add(m[0].replace(/[.,;!]$/,''));
  return [...found.values()].slice(0,100);
+}
+// Raw board links carrying a Miro invitation (share_link_id). Only passed to the
+// native encrypted store; never stored in findings, exports or search sources.
+export function miroInviteLinks(body,links=[]){
+ const input=typeof body==='string'?body.slice(0,200000).replace(/&amp;/g,'&'):'',found=new Set();
+ for(const url of [...[...input.matchAll(/https:\/\/(?:www\.)?miro\.com\/app\/board\/[^\s<>"'\])]+/gi)].map(m=>m[0]),...links.map(l=>typeof l?.url==='string'?l.url:'')])
+  if(found.size<100&&/[?&]share_link_id=[A-Za-z0-9_-]{4,80}(?:[&#]|$)/.test(url))try{miroBoardURL(url);found.add(url.slice(0,2048));}catch{}
+ return [...found];
+}
+/** Applies public oEmbed metadata to every finding of the same board. */
+export function applyMiroMetadata(findings,boards,now=new Date().toISOString()){
+ const meta=new Map();for(const b of Array.isArray(boards)?boards.slice(0,100):[])try{meta.set(miroBoardURL(b.url),b);}catch{}
+ return findings.map(f=>{const b=meta.get(f.url);return b?{...f,miroTitle:b.available?plain(b.title).slice(0,240):f.miroTitle||'',miroOwner:b.available?plain(b.author).slice(0,200):f.miroOwner||'',miroCheckedAt:stamp(now)}:f;});
 }
 export function validateBoardFindings(value=[],projectIds){
  if(!Array.isArray(value)||value.length>5000)throw new Error('Zu viele Board-Fundstellen.');
@@ -74,24 +87,24 @@ export function validateBoardFindings(value=[],projectIds){
 }
 export function mergeBoardFindings(previous,fresh){
  const rows=new Map(validateBoardFindings(previous).map(f=>[f.id,f]));
- for(const f of validateBoardFindings(fresh)){const old=rows.get(f.id);rows.set(f.id,{...f,...preferredTitle(old,f),foundAt:old?.foundAt||f.foundAt,customTitle:old?.customTitle||f.customTitle,...(old?.assignedProjectId!==null&&old?.assignedProjectId!==undefined?{assignedProjectId:old.assignedProjectId,projectId:old.assignedProjectId}:{}),postedBy:f.postedBy||old?.postedBy||'',postedAt:f.postedAt||old?.postedAt||''});}
+ for(const f of validateBoardFindings(fresh)){const old=rows.get(f.id);rows.set(f.id,{...f,...preferredTitle(old,f),foundAt:old?.foundAt||f.foundAt,customTitle:old?.customTitle||f.customTitle,miroTitle:f.miroTitle||old?.miroTitle||'',miroOwner:f.miroOwner||old?.miroOwner||'',miroCheckedAt:f.miroCheckedAt||old?.miroCheckedAt||'',...(old?.assignedProjectId!==null&&old?.assignedProjectId!==undefined?{assignedProjectId:old.assignedProjectId,projectId:old.assignedProjectId}:{}),postedBy:f.postedBy||old?.postedBy||'',postedAt:f.postedAt||old?.postedAt||''});}
  if(rows.size>5000)throw new Error('Das Board-Verzeichnis ist voll. Exportiere und bereinige es vor der nächsten Suche.');
  return [...rows.values()];
 }
 export function collectLocalBoards({workspace,updates=[],browserSources=[],courseOf=()=>''},now=new Date().toISOString()){
- const found=[],courseTitles=new Map((workspace.projects||[]).map(p=>[p.id,p.name]));let count=0;
- function add(source,body,links=[]){count++;source={...source,projectTitle:courseTitles.get(source.projectId)||''};for(const l of [...extractBoardLinks(body),...links].slice(0,100))try{found.push(boardFinding(l,source,now));}catch{}}
+ const found=[],invites=new Set(),courseTitles=new Map((workspace.projects||[]).map(p=>[p.id,p.name]));let count=0;
+ function add(source,body,links=[]){count++;for(const url of miroInviteLinks(body,links))if(invites.size<100)invites.add(url);source={...source,projectTitle:courseTitles.get(source.projectId)||''};for(const l of [...extractBoardLinks(body),...links].slice(0,100))try{found.push(boardFinding(l,source,now));}catch{}}
  for(const p of workspace.projects||[]){if(p.archived)continue;add({id:'project:'+p.id,projectId:p.id,title:p.name,kind:'project'},p.note,(p.links||[]).map(l=>({url:l.url,title:l.title})));}
  for(const b of workspace.bookmarks||[])add({id:'bookmark:'+b.id,projectId:b.projectId,title:b.title,kind:'bookmark'},b.note,[{url:b.url,title:b.title}]);
  for(const n of workspace.notes||[])add({id:'note:'+n.id,projectId:n.projectId,title:n.title,kind:'note'},n.content);
  for(const t of workspace.tasks||[])add({id:'task:'+t.id,projectId:t.projectId,title:t.title,kind:'task'},t.title,t.url?[{url:t.url}]:[]);
  for(const u of updates){if(!['spaces','mattermost','gitlab'].includes(u.source))continue;let projectId='';try{projectId=courseOf(u);}catch{}add({id:u.id,projectId,title:u.title,kind:u.source,url:u.url,postedBy:typeof u.author==='string'?u.author:u.author?.name||'',postedAt:u.kind==='summary'?'':u.createdAt},(u.summary||'')+'\n'+(u.content||''));}
  for(const s of browserSources)add({id:s.id,projectId:s.projectId,title:s.title,kind:'spaces',url:s.url},s.text,s.boardLinks||[]);
- return {findings:mergeBoardFindings([],found),sources:count};
+ return {findings:mergeBoardFindings([],found),sources:count,invites:[...invites]};
 }
 export function groupBoards(findings,{projectId='',query='',sort='recent'}={}){
  const groups=new Map(),q=query.toLocaleLowerCase('de').trim();
- for(const f of findings){if(projectId&&f.projectId!==projectId)continue;const id=f.url+'|'+f.projectId;const g=groups.get(id)||{id,url:f.url,projectId:f.projectId,title:'Miro-Board',titleOrigin:'unknown',occurrences:[]};g.occurrences.push(f);Object.assign(g,preferredTitle(g,f.customTitle?{title:f.customTitle,titleOrigin:'custom'}:f));groups.set(id,g);}
+ for(const f of findings){if(projectId&&f.projectId!==projectId)continue;const id=f.url+'|'+f.projectId;const g=groups.get(id)||{id,url:f.url,projectId:f.projectId,title:'Miro-Board',titleOrigin:'unknown',owner:'',occurrences:[]};g.occurrences.push(f);Object.assign(g,preferredTitle(g,f.customTitle?{title:f.customTitle,titleOrigin:'custom'}:f));if(f.miroTitle)Object.assign(g,preferredTitle(g,{title:f.miroTitle,titleOrigin:'miro'}));g.owner||=f.miroOwner||'';groups.set(id,g);}
  return [...groups.values()].filter(g=>!q||[g.title,g.url,...g.occurrences.flatMap(f=>[f.sourceTitle,f.postedBy])].join(' ').toLocaleLowerCase('de').includes(q)).sort((a,b)=>sort==='title'?a.title.localeCompare(b.title,'de'):(Math.max(...b.occurrences.map(f=>Date.parse(f.postedAt||f.foundAt)||0))-Math.max(...a.occurrences.map(f=>Date.parse(f.postedAt||f.foundAt)||0))));
 }
 

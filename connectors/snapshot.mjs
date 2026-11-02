@@ -27,7 +27,7 @@ export async function withSnapshot(feed,path){
   if(!path)return {...feed,courses:[]};
   try{
     const snapshot=await readSnapshot(path);
-    const live=new Set(feed.sources.filter(s=>s.status==='connected').map(s=>s.source));
+    const live=new Set(feed.sources.filter(s=>['connected','error','login_required'].includes(s.status)).map(s=>s.source));
     return {...feed,courses:snapshot.courses,items:[...feed.items,...snapshot.items.filter(n=>!live.has(n.source))],sources:[...feed.sources.filter(s=>!snapshot.sources.some(p=>p.source===s.source)||live.has(s.source)),...snapshot.sources.filter(s=>!live.has(s.source))]};
-  }catch(error){return {...feed,courses:[],sources:[...feed.sources,{source:'spaces',status:error.code==='ENOENT'?'not_configured':'error',message:error.code==='ENOENT'?'Kein lokaler Browser-Stand vorhanden.':'Lokaler Browser-Stand konnte nicht gelesen werden.'}]};}
+  }catch(error){return {...feed,courses:[],sources:[...feed.sources,{source:'spaces',status:error.code==='ENOENT'?'not_configured':'error',message:error.code==='ENOENT'?'Noch nicht angemeldet. Melde dich im Context-Browser bei Spaces an.':'Lokaler Browser-Stand konnte nicht gelesen werden.'}]};}
 }

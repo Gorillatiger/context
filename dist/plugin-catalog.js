@@ -60,7 +60,7 @@ export const PLUGIN_CATALOG = freeze([
     mode: "browser",
     source: "spaces",
     description:
-      "Kurs-Spaces im eigenen Browser öffnen. Der Assistent kann sichtbare Kursseiten lesen und erlaubten Spaces-Links folgen.",
+      "Kurs-Spaces im Browser öffnen und Beiträge sowie Kommentare in den Mitteilungen synchronisieren. Der Assistent kann Kursseiten lesen.",
     permissions: [
       "Lesender Zugriff auf sichtbaren Spaces-Text bei einem Agentenauftrag.",
       "Gespeicherte Kurslinks und vorhandene lokale Mitteilungen.",
@@ -96,9 +96,9 @@ export const PLUGIN_CATALOG = freeze([
     storage:
       "Einrichtungszugänge bleiben in der laufenden lokalen Sitzung. Übernommene Hinweise und ihre Kurszuordnung bleiben lokal.",
     setup:
-      "Einrichtung öffnen und einen autorisierten Mattermost-Zugang hinterlegen; für die Website separat in Context Browser anmelden.",
+      "In Context Browser bei Mattermost anmelden. Ein eingerichteter API-Token kann alternativ genutzt werden.",
     limitation:
-      "Ein Website-Login bestätigt keinen API-Zugang. Begrenzter Teilstand: bis zu 20 Kanäle prüfen, bis zu 10 davon mit je 10 Textvorschauen. Keine Direktnachrichten, Anhänge, Medien oder vollständige Offline-Chatkopie.",
+      "Context Browser synchronisiert über die vorhandene Website-Sitzung. Begrenzter Teilstand: bis zu 20 Kanäle prüfen, bis zu 10 davon mit je 10 Textvorschauen. Keine Direktnachrichten, Anhänge, Medien oder vollständige Offline-Chatkopie.",
     action: connection("mattermost"),
     actionLabel: "Connector einrichten",
     secondary: website("https://chat.coco.study/", "Mattermost öffnen"),
@@ -123,9 +123,9 @@ export const PLUGIN_CATALOG = freeze([
     storage:
       "Token bleibt in der laufenden lokalen Sitzung; übernommene Hinweise und Projektlinks bleiben lokal.",
     setup:
-      "GitLab-Connector einrichten. Für Browser-Anmeldungen ein eigenes Login in Context Browser verwenden.",
+      "In Context Browser bei GitLab anmelden oder einen lesenden Token im lokalen Connector einrichten.",
     limitation:
-      "Der Connector ist vorbereitet; ein Browser-Login allein aktiviert ihn nicht. Er importiert keine kompletten Repositories.",
+      "Context Browser synchronisiert offene To-dos über die Website-Sitzung. Vollständige Repositories werden nicht importiert.",
     action: connection("gitlab"),
     actionLabel: "Connector einrichten",
     secondary: website("https://git.coco.study/", "GitLab öffnen"),

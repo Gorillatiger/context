@@ -142,3 +142,8 @@ body.ai-active .context-agent-launcher { display: none; }
   .context-agent-panel .ki-chat-menu { top: 54px; }
   .ki-chat .ki-message-actions { flex-direction: row; }
 }
+
+.ki-switch-hint{margin:10px 0 2px;padding:12px 14px;border:1px solid var(--line);border-radius:12px}
+.ki-switch-hint p{margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--muted)}
+.ki-switch-hint strong{color:var(--ink)}
+.ki-switch-actions{display:flex;flex-wrap:wrap;gap:8px}

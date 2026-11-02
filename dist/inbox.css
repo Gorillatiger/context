@@ -105,3 +105,12 @@ html[data-theme="dark"] .inbox-read-filters .filter.selected{background:var(--ac
   .inbox-notice.notification-row{padding:12px 10px;gap:7px}
   .inbox-notice .notification-source .tool-icon.small{width:20px;height:20px}
 }
+
+.inbox-setup{margin:0 0 16px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:var(--surface,transparent)}
+.inbox-setup h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:15px;color:var(--ink)}
+.inbox-setup p{margin:0 0 12px;font-size:13px;line-height:1.55;color:var(--muted)}
+.inbox-setup small{display:block;margin-top:10px;font-size:11px;color:var(--muted)}
+.inbox-setup-actions,.modal-actions-row{display:flex;flex-wrap:wrap;gap:8px}
+.modal-actions-row{margin:14px 0}
+.modal-actions-row:empty{display:none}
+.integration-note .inbox-setup-actions{margin-top:10px}

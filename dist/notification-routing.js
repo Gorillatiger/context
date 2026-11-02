@@ -1,7 +1,7 @@
 // Deterministic provenance only. No titles, message bodies, network or account
 // state participate in course routing; opaque provider IDs need an explicit
 // persisted group mapping before they can become evidence.
-const origins={spaces:'https://spaces.th-koeln.de',mattermost:'https://chat.coco.study',gitlab:'https://git.coco.study'};
+const origins={spaces:'https://spaces.th-koeln.de',mattermost:'https://chat.coco.study',gitlab:'https://git.coco.study',sciebo:'https://th-koeln.sciebo.de',miro:'https://miro.com',whatsapp:'https://web.whatsapp.com',signal:'https://signal.org'};
 const mailSources=new Set(['webmail','mail','gmail','outlook']);
 const privateSegments=new Set(['user','users','auth','authentication','login','logout','signin','signout','oauth','oauth2','password','account','accounts','profile','settings','mail','webmail','messages','direct','dashboard']);
 const result=(projectId='',reason='unassigned',manual=false,ambiguous=false)=>({projectId,reason,manual,ambiguous});

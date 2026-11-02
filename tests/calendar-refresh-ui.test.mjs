@@ -60,7 +60,7 @@ test('startup reads connected calendars without visiting calendar and repeats ne
   assert.equal(f.calls.filter(c=>c.action==='events').length,2);
   assert.equal(f.calls.some(c=>c.action==='sync'),false,'saved target alone must never authorize automatic writes');
   const ids=f.workspace.calendarEvents.map(e=>e.id).sort();
-  f.click();await tick();
+  f.click();await until(()=>/Alle Termine aktuell/.test(f.view.render()));
   assert.deepEqual(f.workspace.calendarEvents.map(e=>e.id).sort(),ids);
   assert.match(f.view.render(),/Alle Termine aktuell/);assert.equal(f.saveCalls,1,'unchanged pulls do not save or log another import');
   const read=f.calls.find(c=>c.action==='events');

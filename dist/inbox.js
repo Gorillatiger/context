@@ -26,13 +26,13 @@ const knownDate=value=>typeof value==='string'&&value&&!Number.isNaN(Date.parse(
 export function parseNotificationItems(items){
   if(!Array.isArray(items)||items.length>2200)throw new Error('invalid_feed');
   return items.map(item=>{
-    if(!item||!['spaces','mattermost','gitlab','webmail'].includes(item.source)||typeof item.id!=='string'||!/^[-a-zA-Z0-9_]{1,150}$/.test(item.id)||typeof item.createdAt!=='string'||item.createdAt&&!knownDate(item.createdAt))throw new Error('invalid_feed');
+    if(!item||!['spaces','mattermost','gitlab','webmail','sciebo','miro','whatsapp','signal'].includes(item.source)||typeof item.id!=='string'||!/^[-a-zA-Z0-9_]{1,150}$/.test(item.id)||typeof item.createdAt!=='string'||item.createdAt&&!knownDate(item.createdAt))throw new Error('invalid_feed');
     const url=safeURL(item.url),groupUrl=item.groupUrl?safeURL(item.groupUrl):'';
     return {...item,title:requireText(item.title),summary:cleanText(item.summary||'',500),content:cleanText(item.content||'',20000),groupName:cleanText(item.groupName||'',200),url,groupUrl:groupUrl&&new URL(groupUrl).origin===new URL(url).origin?groupUrl:'',revision:cleanText(item.revision||'1',100),displayedTime:cleanText(item.displayedTime||'',100),observedAt:knownDate(item.observedAt)?item.observedAt:'',checkedAt:knownDate(item.checkedAt)?item.checkedAt:'',capturedAt:knownDate(item.capturedAt)?item.capturedAt:''};
   });
 }
 
-const timeOf=item=>item.kind==='summary'?(item.observedAt||item.checkedAt||item.capturedAt||item.createdAt):item.createdAt;
+const timeOf=item=>item.kind==='summary'||item.timeKind==='observed'?(item.observedAt||item.checkedAt||item.capturedAt||item.createdAt):item.createdAt;
 export function compareNotificationTime(a,b){
   const left=knownDate(timeOf(a))?Date.parse(timeOf(a)):null,right=knownDate(timeOf(b))?Date.parse(timeOf(b)):null;
   return left===null?(right===null?0:1):right===null?-1:right-left;
@@ -40,7 +40,7 @@ export function compareNotificationTime(a,b){
 
 export function notificationTime(item,now=Date.now()){
   if(typeof item.displayedTime==='string'&&item.displayedTime)return item.displayedTime;
-  const value=timeOf(item),summary=item.kind==='summary';
+  const value=timeOf(item),summary=item.kind==='summary'||item.timeKind==='observed';
   if(!knownDate(value))return summary?'Stand unbekannt':'Zeitpunkt unbekannt';
   const age=Math.floor((now-Date.parse(value))/60000);
   const label=age<0?'am '+formatSnapshotTime(value):age<1?'gerade eben':age<60?`vor ${age} Min.`:age<1440?`vor ${Math.floor(age/60)} Std.`:formatSnapshotTime(value);
@@ -50,7 +50,7 @@ export function notificationTime(item,now=Date.now()){
 export function previewContent(item){
   const content=typeof item.content==='string'&&item.content.length<=20000?item.content:'';
   const full=content&&item.contentStatus==='full';
-  const label=full?'Vollständiger Text':content?'Textauszug':item.source==='webmail'?'Nur Kopfzeilen':item.kind==='summary'?'Zusammenfassung':'Nachrichtentext noch nicht eingelesen';
+  const label=item.source==='miro'&&item.contentStatus==='summary'?'Board-Metadaten':full?'Vollständiger Text':content?'Textauszug':item.source==='webmail'?'Nur Kopfzeilen':item.kind==='summary'?'Zusammenfassung':'Nachrichtentext noch nicht eingelesen';
   return {text:content,label,full:!!full,html:content?`<div class="message-text">${escape(content)}</div>`:''};
 }
 

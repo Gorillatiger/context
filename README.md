@@ -2,7 +2,7 @@
 
 Ein lokaler Studien-Hub für Code & Context an der TH Köln. Kurse, Aufgaben, Notizen, Quellen, Mail und Kalender stehen in einer Oberfläche bereit. Ein KI-Begleiter kann freigegebene Quellen lesen und Antworten mit Quellenlinks liefern.
 
-**Stand: 0.17.4.** Entwicklungsprojekt, keine offizielle Anwendung der TH Köln. Integrationen benötigen eine eigene Anmeldung und gegebenenfalls eigene API-/OAuth-Konfiguration; ein Link allein ist noch kein verbundener Connector.
+**Stand: 0.18.3.** Entwicklungsprojekt, keine offizielle Anwendung der TH Köln. Integrationen benötigen eine eigene Anmeldung und gegebenenfalls eigene API-/OAuth-Konfiguration; ein Link allein ist noch kein verbundener Connector.
 
 ## Starten
 

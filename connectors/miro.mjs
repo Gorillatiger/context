@@ -14,6 +14,9 @@ const messages = {
   scope_changed:'Die Kurszuordnung wurde während des Lesens geändert. Bitte erneut versuchen.',
   board_not_allowed:'Dieses Board ist keinem freigegebenen Kurs zugeordnet.',closed:'Der Miro-Dienst wurde geschlossen.',
   busy:'Es wird bereits ein Miro-Board gelesen.',
+  login_required:'Dieses Miro-Board verlangt eine Anmeldung. Öffne es im eingebauten Browser und melde dich an oder bitte um einen öffentlichen Link.',
+  no_access:'Dieses Miro-Board ist für Besucher nicht freigegeben. Bitte die Lehrkraft um einen Link mit Lesezugriff.',
+  overview_unavailable:'Die öffentliche Board-Übersicht von Miro war nicht verfügbar. Öffne das Board im Browser oder versuche es später erneut.',
 };
 export class MiroError extends Error {
   constructor(code,status=400) { super(messages[code] || messages.provider_error);this.name='MiroError';this.code=Object.hasOwn(messages,code)?code:'provider_error';this.status=status; }

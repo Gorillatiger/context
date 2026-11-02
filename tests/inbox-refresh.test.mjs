@@ -9,9 +9,12 @@ const item=(id,group='B',extra={})=>({id,source:'gitlab',title:'Kursaufgabe',sum
 test('the actual Inbox renderer resets a vanished selected group before filtering the refreshed feed',()=>{
  const source=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
  const code=source.slice(source.indexOf('function filteredInboxItems()'),source.indexOf('\nfunction previewNotification('));
- const context={inboxGroup:'gitlab_project_A',inboxSource:'all',inboxFilter:'all',inboxLimit:50,feedBusy:false,feedCheckedAt:'',hasLocalConnector:true,sourceStates:[],state:{projects:[],activeCourse:'',inboxRead:[],notificationSettings:{desktop:false}},inboxItems:()=>[item('retained')],notificationGroups,notificationGroup,notificationKey,resolveNotificationGroup,formatSnapshotTime:()=>'',heading:()=>'',icon:()=>'',esc:String,sourceName:String,notificationRow:n=>'VISIBLE:'+n.id,empty:()=>''};
+ const context={inboxGroup:'gitlab_project_A',inboxSource:'all',inboxFilter:'all',inboxLimit:50,feedBusy:false,feedCheckedAt:'',hasLocalConnector:true,sourceStates:[],state:{projects:[],activeCourse:'',inboxRead:[],notificationSettings:{desktop:false}},inboxItems:()=>[item('retained')],notificationGroups,notificationGroup,notificationKey,resolveNotificationGroup,formatSnapshotTime:()=>'',heading:()=>'',icon:()=>'',esc:String,sourceName:String,notificationRow:n=>'VISIBLE:'+n.id,empty:()=>'',desktopBrowserAvailable:()=>true,SERVICE_LOGIN:{spaces:['TH-Spaces'],mattermost:['Mattermost'],gitlab:['GitLab'],sciebo:['Sciebo']},serviceLoginButton:id=>'LOGIN:'+id,monogram:()=>''};
  vm.createContext(context);vm.runInContext(code,context);
- assert.match(vm.runInContext('renderInbox()',context),/VISIBLE:retained/);assert.equal(context.inboxGroup,'all');
+ const html=vm.runInContext('renderInbox()',context);assert.match(html,/VISIBLE:retained/);assert.equal(context.inboxGroup,'all');
+ // Without a connected source the person gets sign-in actions, not a dead end.
+ assert.match(html,/Noch keine Quelle verbunden/);for(const id of ['spaces','mattermost','gitlab','sciebo'])assert.match(html,new RegExp('LOGIN:'+id));
+ context.sourceStates=[{source:'gitlab',status:'connected',complete:true}];assert.doesNotMatch(vm.runInContext('renderInbox()',context),/Noch keine Quelle verbunden/);context.sourceStates=[];
  context.inboxGroup='gitlab_project_B';vm.runInContext('renderInbox()',context);assert.equal(context.inboxGroup,'gitlab_project_B');
 });
 test('a missing publication date does not make the valid sibling notification disappear',()=>{

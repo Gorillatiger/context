@@ -14,6 +14,6 @@ export async function aiRequest(provider,action,{body,signal}={}){
   if(provider==='local')throw new Error('Lokale Modelle werden in der aktuellen Context-Mac-App verbunden. Es wird kein Cloud-Anbieter verwendet.');
   const response=await fetch('/api/ai/'+action+(provider==='openrouter'&&!body?'?provider=openrouter':''),{credentials:'same-origin',signal,...(body?{method:'POST',headers:{'Content-Type':'application/json','X-Context-Request':'ki-request'},body:JSON.stringify({...body,...(provider==='openrouter'?{provider}:{})})}:{})});
   let result;try{result=await response.json();}catch{throw new Error('Die lokale KI-Verbindung ist nicht erreichbar.');}
-  if(!response.ok)throw new Error(result.message||'Die KI-Anfrage konnte nicht abgeschlossen werden.');
+  if(!response.ok)throw Object.assign(new Error(result.message||'Die KI-Anfrage konnte nicht abgeschlossen werden.'),{code:typeof result.error==='string'?result.error:undefined});
   return result;
 }

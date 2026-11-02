@@ -4,12 +4,13 @@ import {createDesktopMiro} from './miro.mjs';
 import {safeMiroBoard} from '../connectors/miro.mjs';
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fail=(message,code='INVALID_REQUEST')=>{throw Object.assign(new Error(message),{code});};
-export function createDesktopPlatform({nango,createView,destroyView,openVisible,fetchText,readDocument,getAccountFingerprint=async()=>hash('session'),emit=()=>{}}){
+export function createDesktopPlatform({nango,createView,destroyView,openVisible,fetchText,readDocument,miroVisitor,miroLinks,getAccountFingerprint=async()=>hash('session'),emit=()=>{},onNotificationChange=()=>{}}){
   let sources=[],boards=[],scopeHash=hash([]),scopeEpoch=0,generation=hash([scopeHash,scopeEpoch]),disposed=false;
+  const notificationSnapshots=new Map();
   const accounts={gitlab:'',sciebo:'',mattermost:''},accountEpochs={gitlab:0,sciebo:0,mattermost:0};
   async function account(service){const token=accountEpochs[service],value=await getAccountFingerprint(service);if(disposed||token!==accountEpochs[service])fail('Die Anmeldung wurde geändert.','ACCOUNT_CHANGED');if(typeof value!=='string'||!/^[a-f0-9]{64}$/.test(value))fail('Ungültige Sitzung.');if(accounts[service]&&accounts[service]!==value){reader.invalidate();accountEpochs[service]++;emit({service});}accounts[service]=value;return value;}
-  const reader=createServiceReader({createView,destroyView,openVisible,fetchText,readDocument,getSources:()=>sources,getAuthRevision:service=>(accounts[service]||'')+':'+accountEpochs[service]});
-  const miro=createDesktopMiro({nango,getAllowedBoards:()=>boards,getGeneration:()=>generation});
+  const reader=createServiceReader({createView,destroyView,openVisible,fetchText,readDocument,rememberInvites:invites=>miroLinks?.remember(invites),getSources:()=>sources,getAuthRevision:service=>(accounts[service]||'')+':'+accountEpochs[service]});
+  const miro=createDesktopMiro({nango,visitor:miroVisitor,shareLinks:miroLinks,getAllowedBoards:()=>boards,getGeneration:()=>generation});
   function registry(values){
     if(!Array.isArray(values)||values.length>100)fail('Zu viele Plattformquellen.');
     const all=values.map(row=>{
@@ -18,7 +19,7 @@ export function createDesktopPlatform({nango,createView,destroyView,openVisible,
       return {...row,url:safeMiroBoard(row.url).url};
     });
     if(new Set(all.map(row=>row.id)).size!==all.length)fail('Doppelte Plattformquelle.');
-    const next=hash(all);if(next!==scopeHash){reader.invalidate();sources=all.filter(row=>row.service!=='miro');boards=all.filter(row=>row.service==='miro');scopeHash=next;scopeEpoch++;generation=hash([scopeHash,scopeEpoch]);}
+    const next=hash(all);if(next!==scopeHash){reader.invalidate();sources=all.filter(row=>row.service!=='miro');boards=all.filter(row=>row.service==='miro');scopeHash=next;scopeEpoch++;generation=hash([scopeHash,scopeEpoch]);onNotificationChange({source:'miro'});}
     return {registered:all.length,generation};
   }
   async function service(message){
@@ -32,5 +33,16 @@ export function createDesktopPlatform({nango,createView,destroyView,openVisible,
     return {...value,scopeGeneration:generation,accountGeneration:accountBefore};
   }
   function invalidate(service){if(disposed||!Object.hasOwn(accounts,service)&&service!=='miro')return;if(service!=='miro'){accounts[service]='';accountEpochs[service]++;}scopeEpoch++;generation=hash([scopeHash,scopeEpoch]);reader.invalidate();emit({service});}
-  return {service,miro,invalidate,cancel:()=>reader.invalidate(),dispose:()=>{disposed=true;reader.dispose();miro.dispose();sources=[];boards=[];},generation:()=>generation};
+  return {service,miro:async message=>{
+    const before=message?.action==='board'?await getAccountFingerprint('miro'):'';
+    const value=await miro(message);
+    if(message?.action==='board'){
+      if(await getAccountFingerprint('miro')!==before)fail('Die Anmeldung wurde geändert.','ACCOUNT_CHANGED');
+      const board=value.board,key=value.projectId+':'+board.url;
+      notificationSnapshots.delete(key);notificationSnapshots.set(key,{url:board.url,title:board.title,projectId:value.projectId,modifiedAt:board.modifiedAt,fetchedAt:value.fetchedAt,basis:value.coverage?.basis,revision:hash((value.documents||[]).map(doc=>[doc.id,doc.title,doc.text])),account:before});
+      while(notificationSnapshots.size>50)notificationSnapshots.delete(notificationSnapshots.keys().next().value);
+      onNotificationChange({source:'miro'});
+    }
+    return value;
+  },notificationBoards:()=>boards.map(board=>({url:board.url,title:board.title,projectId:board.projectId})),notificationSnapshots:account=>[...notificationSnapshots.values()].filter(snapshot=>snapshot.account===account&&boards.some(board=>board.url===snapshot.url&&board.projectId===snapshot.projectId)),invalidate,cancel:()=>reader.invalidate(),dispose:()=>{disposed=true;reader.dispose();miro.dispose();sources=[];boards=[];notificationSnapshots.clear();},generation:()=>generation};
 }

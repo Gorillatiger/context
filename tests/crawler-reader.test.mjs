@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
 import {readScript,crawlerURL} from '../desktop/reader.mjs';
+import {createMiroShareLinks} from '../desktop/miro-links.mjs';
 
 const COURSE='https://spaces.th-koeln.de/synthetic-course/';
 function element({tag='div',id='',classes=[],attributes={},parent=null,visible=true,text='',href='',form=null}={}){
@@ -123,7 +124,10 @@ test('rendered Miro anchor labels retain the canonical href and real enclosing-p
   const f=fixture({links:[anchor],posts:[post],nodes:[{textContent:'Unser Miroboard',parentElement:anchor}]}),page=await f.read();
   assert.equal(page.text,'Unser Miroboard');assert.equal(page.links.length,0);assert.equal(page.boardLinks.length,1);const board=page.boardLinks[0];
   assert.equal(board.url,'https://miro.com/app/board/abcd=/');assert.equal(board.title,'Unser Miroboard');assert.equal(board.postedBy,'Synthetic post author');assert.equal(board.postedAt,'2026-10-14T07:00:00.000Z');assert.equal(board.sourceTitle,'Actual synthetic workshop');assert.equal(board.sourceURL,COURSE+'article/');assert.equal(page.metadata.postedBy,'');assert.equal(page.boardLinksMore,false);
-  assert.doesNotMatch(JSON.stringify(page),/INVITATION_TOKEN_PRIVATE|PRIVATE_FRAGMENT|share_link_id/);
+  // The invitation is separated for the native encrypted store; links, titles and sources stay token-free.
+  assert.equal(JSON.stringify(page.boardInvites),JSON.stringify([{url:'https://miro.com/app/board/abcd=/',share:'INVITATION_TOKEN_PRIVATE'}]));
+  const {boardInvites,...visible}=page;assert.doesNotMatch(JSON.stringify(visible),/INVITATION_TOKEN_PRIVATE|PRIVATE_FRAGMENT|share_link_id/);
+  createMiroShareLinks({}).take(page);assert.equal('boardInvites' in page,false);assert.doesNotMatch(JSON.stringify(page),/INVITATION_TOKEN_PRIVATE|PRIVATE_FRAGMENT|share_link_id/);
 });
 
 test('Miro references in comments, sidebars and ambiguous posts cannot inherit somebody else’s author or timestamp',async()=>{

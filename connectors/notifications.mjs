@@ -130,7 +130,7 @@ export async function collectNotifications(env=process.env,deps={}) {
     {source:'webmail',enabled:deps.mailClient?deps.mailClient.status().configured:!!env.TH_MAIL_USER&&!!env.TH_MAIL_PASSWORD,read:()=>deps.mailClient?deps.mailClient.notifications():mailNotifications(env.TH_MAIL_USER,env.TH_MAIL_PASSWORD,deps.mailRunner)}
   ];
   const results=await Promise.all(configured.map(async p=>{
-    if(!p.enabled)return {source:p.source,status:'not_configured',items:[],message:'Verbindung noch nicht eingerichtet.'};
+    if(!p.enabled)return {source:p.source,status:'not_configured',items:[],message:'Noch nicht angemeldet. Melde dich im Context-Browser an.'};
     try{const result=await p.read();return {source:p.source,status:'connected',...(Array.isArray(result)?{items:result,checkedAt:new Date().toISOString()}:result)};}
     catch(error){return {source:p.source,status:'error',items:[],message:error.status===401||error.status===403?'Zugriff abgelehnt. Verbindung prüfen.':error.status===429?'Anbieter-Limit erreicht. Später erneut versuchen.':'Abruf fehlgeschlagen. Verbindung prüfen.'};}
   }));

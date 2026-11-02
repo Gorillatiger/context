@@ -265,8 +265,7 @@ test('usage remains available while a chat is active and does not consume the ch
   assert.equal(chats, 10);
   assert.equal(keys, 10, 'chat completion invalidates the previous usage cache');
   await client.usage();
-  await assert.rejects(client.complete(INPUT), hasCode('local_limit'));
-  now = 60001;
+  // OpenRouter has no per-minute message quota; only KI:connect is throttled.
   await client.complete(INPUT);
   assert.equal(chats, 11);
 });
