@@ -23,15 +23,16 @@ export const knownCourseRoots=projects=>{
 export async function discoverNewCourses({projects,request,signal}){
   if(typeof request!=='function')throw new Error('Spaces-Browserwerkzeuge sind nicht verfügbar.');
   const known=knownCourseRoots(projects);
-  const page=await request({command:'start',url:ENTRY,background:true,scan:true},{signal});
+  await request({command:'start',url:ENTRY,background:true,scan:true},{signal});
+  const page=await request({command:'courses',background:true,scan:true},{signal});
   if(page?.loginRequired)return {status:'login_required',courses:[],checked:0};
-  if(!Array.isArray(page?.links))return {status:'update_required',courses:[],checked:0};
+  if(!Array.isArray(page?.courses))return {status:'update_required',courses:[],checked:0};
   const found=new Map();
-  for(const l of page.links){
+  for(const l of page.courses){
     const url=courseRootURL(l?.url);
     if(!url||known.has(url)||found.has(url))continue;
     const title=typeof l.title==='string'?l.title.replace(/\s+/g,' ').trim().slice(0,160):'';
     found.set(url,{url,title:title||decodeURIComponent(new URL(url).pathname.replaceAll('/','')).replace(/[-_]+/g,' ')});
   }
-  return {status:'ok',courses:[...found.values()].slice(0,30),checked:page.links.length};
+  return {status:'ok',courses:[...found.values()].slice(0,30),checked:page.courses.length};
 }

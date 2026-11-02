@@ -10,7 +10,7 @@ test('only single-segment Spaces course roots are accepted',()=>{
 });
 
 test('already linked courses are not offered again',async()=>{
-  const request=async()=>({links:[
+  const request=async()=>({courses:[
     {title:'Prototyping Things',url:'https://spaces.th-koeln.de/prototyping-things-w26/news/'},
     {title:'Neuer Kurs',url:'https://spaces.th-koeln.de/neuer-kurs-w26/'},
     {title:'Doppelt',url:'https://spaces.th-koeln.de/neuer-kurs-w26/aufgaben/'}
