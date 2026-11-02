@@ -28,6 +28,9 @@ import { renderMarkdown } from './markdown.js';
 import {notificationGroup,notificationGroups,previewContent,formatSnapshotTime,resolveNotificationGroup,parseNotificationItems,compareNotificationTime,notificationTime} from './inbox.js';
 import { createZIP, hasCredentialMaterial, githubRepositoryURL } from './zip.js';
 import {spaceBrowserURL} from './spaces.js';
+import {discoverNewCourses} from './course-discovery.js';
+import {agentBrowserAvailable,requestAgentBrowser} from './agent-browser.js';
+import {groupTasks,buildTaskContext,analyzeTasks} from './task-insights.js';
 import {nativeSpacesAvailable,openNativeSpace,mountNativeSpace,detachNativeSpace} from './native-space.js';
 import {createKIView} from './ki.js';
 import {createMailAccounts} from './mail-accounts.js';
@@ -180,7 +183,7 @@ function toast(text, undoCallback) {
   $('#toast').innerHTML=`<span>${esc(text)}</span>${undoCallback?'<button data-action="undo">Rückgängig</button>':''}`;
   $('#toast').classList.add('visible'); toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),7000);
 }
-function setView(next) { if(!views.has(next))return;view=next;if(location.hash!=='#'+next)history.pushState(null,'','#'+next);document.body.classList.remove('nav-open');render();$('#main').focus({preventScroll:true});window.scrollTo(0,0);if(next==='connections')void nangoConnections.open(); }
+function setView(next) { if(!views.has(next))return;view=next;if(location.hash!=='#'+next)history.pushState(null,'','#'+next);document.body.classList.remove('nav-open');render();$('#main').focus({preventScroll:true});window.scrollTo(0,0);if(next==='connections')void nangoConnections.open();if(next==='tasks')void runPlanCheck(false); }
 const inCourse=item=>courseMatches(item.projectId,state.activeCourse);
 const scopedState=()=>({...state,tasks:state.tasks.filter(inCourse)});
 function courseOptions(){return `<option value="">Alle Kurse</option>${state.projects.filter(p=>!p.archived||p.id===state.activeCourse).map(p=>`<option value="${p.id}" ${state.activeCourse===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}`;}
@@ -299,7 +302,7 @@ function render() {
     <button class="workspace" data-view="settings"><span class="workspace-avatar">C&C</span><span>Dein Arbeitsbereich<small>TH Köln · persönlich</small></span><span class="workspace-chevron">⌄</span></button>
     <p class="nav-label">ARBEITSBEREICH</p>
     <nav aria-label="Arbeitsbereich">${renderNavigation()}</nav>
-    <div class="sidebar-bottom"><button data-view="settings" class="nav-item ${view==='settings'?'active':''}">${icon('settings')}<span>Einstellungen</span></button><div class="profile"><span class="user-avatar">${esc(state.profile.name?state.profile.name.slice(0,1).toUpperCase():'C')}</span><span>${esc(state.profile.name || 'Dein persönlicher Hub')}<small>Code & Context</small></span><span class="version">v0.18.13</span></div></div>
+    <div class="sidebar-bottom"><button data-view="settings" class="nav-item ${view==='settings'?'active':''}">${icon('settings')}<span>Einstellungen</span></button><div class="profile"><span class="user-avatar">${esc(state.profile.name?state.profile.name.slice(0,1).toUpperCase():'C')}</span><span>${esc(state.profile.name || 'Dein persönlicher Hub')}<small>Code & Context</small></span><span class="version">v0.18.14</span></div></div>
   </aside>
   <div class="page-shell"><header class="topbar"><div class="breadcrumb"><button class="mobile-menu icon-button" data-action="menu" aria-label="Navigation öffnen" title="Navigation öffnen">${icon('menu')}</button><strong>${names[view]}</strong></div><label class="course-switch"><span>KURS</span><select id="course-switch" aria-label="Kurs auswählen" ${kiView.isBusy()?'disabled':''}>${courseOptions()}</select></label><button class="search-trigger" data-action="search" aria-label="Arbeitsbereich durchsuchen" title="Arbeitsbereich durchsuchen">${icon('search',17)}<span>Suche</span><kbd>⌘ K</kbd></button><button class="theme-toggle icon-button" type="button" data-action="toggle-theme" data-theme-toggle aria-label="Darkmode aktivieren" aria-pressed="false"><span class="theme-moon" aria-hidden="true">${icon('moon',18)}</span><span class="theme-sun" aria-hidden="true">${icon('sun',18)}</span></button><button class="inbox-trigger icon-button" data-view="inbox" aria-label="Posteingang öffnen${unread?', '+unread+' neue Hinweise':''}">${icon('bell',18)}${unread?'<span class="bell-dot"></span>':''}</button><span class="local-indicator"><span class="tiny-dot ${storageAvailable?'':'warning'}"></span>${storageAvailable?'Lokal gespeichert':'Nicht gespeichert'}</span></header>
   <main id="main" tabindex="-1">${({sources:()=>sourceHub.render(),connections:()=>nangoConnections.render(),boards:()=>boardView.render(),inventory:renderInventory,today:renderToday,calendar:()=>calendarView.render(),companion:()=>companion.render(),browser:()=>browserView.render(),inbox:renderInbox,mail:()=>mailView.render(),projects:renderProjects,tasks:renderTasks,links:renderBookmarks,notes:renderNotes,ai:()=>floatingOpen?heading('DEIN KONTEXTASSISTENT','Chat im Panel','',`<button class="button secondary" data-action="context-agent">${icon('star',17)} Chat hier anzeigen</button>`):kiView.render(),imports:renderImports,plugins:renderPlugins,submissions:renderSubmissions,tools:renderTools,settings:renderSettings}[view])()}</main>
@@ -330,10 +333,14 @@ function heading(eyebrow,title,subtitle,action='') {
 function sectionTitle(title,actionText,action) { return `<div class="section-title"><h2>${title}</h2>${actionText?`<button ${action}>${actionText} ${icon('arrow',16)}</button>`:''}</div>`; }
 function empty(title,text,actionText,action,kind='note') { return `<div class="empty-state">${icon(kind,28)}<h3>${esc(title)}</h3><p>${esc(text)}</p>${actionText?`<button class="button secondary" ${action}>${esc(actionText)}</button>`:''}</div>`; }
 function renderNavigation(){
- const primary=[['today','home','Heute'],['projects','projects','Kurse'],['inbox','bell','Mitteilungen'],['mail','mail','Mail'],['calendar','calendar','Kalender'],['notes','note','Notizen'],['ai','star','Context Agent'],['sources','links','Quellen'],['inventory','tools','Studio-Inventar']];
- const secondary=[['tasks','tasks','Aufgaben'],['companion','star','Begleiter'],['boards','projects','Miro-Boards'],['browser','external','Browser'],['links','links','Ablage'],['submissions','upload','Abgaben'],['imports','download','Importieren'],['plugins','tools','Plugins'],['connections','links','Verbindungen'],['tools','tools','Alle Tools']];
+ const groups=[
+  {label:'Täglich',open:true,items:[['today','home','Heute'],['projects','projects','Kurse'],['inbox','bell','Mitteilungen'],['mail','mail','Mail'],['calendar','calendar','Kalender']]},
+  {label:'Lernen & Wissen',items:[['ai','star','Context Agent'],['notes','note','Notizen'],['tasks','tasks','Aufgaben'],['sources','links','Quellen'],['links','links','Ablage'],['boards','projects','Miro-Boards']]},
+  {label:'Werkzeuge',items:[['companion','star','Begleiter'],['browser','external','Browser'],['inventory','tools','Studio-Inventar'],['submissions','upload','Abgaben'],['imports','download','Importieren']]},
+  {label:'Einstellungen',items:[['plugins','tools','Plugins'],['connections','links','Verbindungen'],['tools','tools','Alle Tools']]}
+ ];
  const button=([id,name,label])=>`<button data-view="${id}" class="nav-item ${view===id?'active':''}" ${view===id?'aria-current="page"':''}>${icon(name)}<span>${label}</span></button>`;
- return primary.map(button).join('')+`<details class="nav-more" ${secondary.some(row=>row[0]===view)?'open':''}><summary>${icon('menu',18)}<span>Mehr</span><span aria-hidden="true">⌄</span></summary><div>${secondary.map(button).join('')}</div></details>`;
+ return groups.map(g=>g.open?`<div class="nav-group"><p class="nav-group-label">${g.label}</p>${g.items.map(button).join('')}</div>`:`<details class="nav-group nav-more" ${g.items.some(row=>row[0]===view)?'open':''}><summary><span>${g.label}</span><span aria-hidden="true">⌄</span></summary><div>${g.items.map(button).join('')}</div></details>`).join('');
 }
 function renderToday() {
  const active=state.projects.filter(p=>!p.archived&&courseMatches(p.id,state.activeCourse));
@@ -350,16 +357,60 @@ function projectCard(p) {
 }
 function renderProjects() {
   const list=state.projects.filter(p=>showArchived?p.archived:!p.archived);
-  return heading('DEIN KONTEXT','Projekte','',`<div class="companion-heading-actions"><button class="button secondary" data-action="spaces-crawl">${icon('search',17)} Spaces indexieren</button><button class="button primary" data-action="add-project">${icon('plus',17)} Neues Projekt</button></div>`)+`<div class="filter-row"><button class="filter ${showArchived?'':'selected'}" data-action="project-filter" data-value="active">Aktiv <span>${state.projects.filter(p=>!p.archived).length}</span></button><button class="filter ${showArchived?'selected':''}" data-action="project-filter" data-value="archived">Archiv <span>${state.projects.filter(p=>p.archived).length}</span></button></div><div class="projects-page-grid">${list.map(projectCard).join('')||empty(showArchived?'Archiv leer':'Noch keine Projekte',showArchived?'Projekte lassen sich jederzeit wiederherstellen.':'Kurs-Space, Channel und Repository verbinden.',showArchived?'':'Projekt anlegen','data-action="add-project"','projects')}</div>`;
+  return heading('DEIN KONTEXT','Projekte','',`<div class="companion-heading-actions"><button class="button secondary" data-action="discover-courses">${icon('refresh',17)} Neue Kurse suchen</button><button class="button secondary" data-action="spaces-crawl">${icon('search',17)} Spaces indexieren</button><button class="button primary" data-action="add-project">${icon('plus',17)} Neues Projekt</button></div>`)+`<div class="filter-row"><button class="filter ${showArchived?'':'selected'}" data-action="project-filter" data-value="active">Aktiv <span>${state.projects.filter(p=>!p.archived).length}</span></button><button class="filter ${showArchived?'selected':''}" data-action="project-filter" data-value="archived">Archiv <span>${state.projects.filter(p=>p.archived).length}</span></button></div><div class="projects-page-grid">${list.map(projectCard).join('')||empty(showArchived?'Archiv leer':'Noch keine Projekte',showArchived?'Projekte lassen sich jederzeit wiederherstellen.':'Kurs-Space, Channel und Repository verbinden.',showArchived?'':'Projekt anlegen','data-action="add-project"','projects')}</div>`;
 }
 function taskRow(t,compact=false) {
   const overdue=t.due&&t.due<dateKey()&&t.status!=='done';
   return `<div class="task-row ${compact?'compact':''} ${t.status==='done'?'completed':''}"><button class="task-check ${t.status==='done'?'checked':''}" data-action="toggle-task" data-id="${t.id}" aria-label="${esc(t.title)} ${t.status==='done'?'wieder öffnen':'erledigen'}" aria-pressed="${t.status==='done'}">${t.status==='done'?icon('check',14):''}</button><div class="task-body"><button data-action="edit-task" data-id="${t.id}">${esc(t.title)}</button><div class="task-meta">${t.projectId?`<span class="project-dot ${project(t.projectId)?.color}"></span>${esc(project(t.projectId)?.name || '')}`:'Persönlich'}${t.due?`<span class="due ${overdue?'overdue':''}">${icon('calendar',12)}${dateLabel(t.due)}</span>`:''}</div></div>${!compact?`<span class="task-status ${t.status}">${({todo:'Offen',doing:'In Arbeit',done:'Erledigt'})[t.status]}</span>${t.url?`<a class="icon-button" href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" data-open="Aufgabenquelle" aria-label="Quelle der Aufgabe öffnen">${icon('external',16)}</a>`:''}${iconAction('edit','Aufgabe bearbeiten: '+t.title,`data-action="edit-task" data-id="${t.id}"`)}`:''}</div>`;
 }
+const planState={status:'idle',result:null,error:'',at:0,hint:''};let planAbort;
+const PLAN_AUTO_MS=10*60*1000;
+const PLAN_GROUPS=[['overdue','Überfällig'],['today','Heute'],['week','Diese Woche'],['later','Später'],['nodue','Ohne Frist']];
+function planCourseUpdates(){return remoteItems.filter(n=>courseMatches(notificationCourse(n,state),state.activeCourse));}
+async function runPlanCheck(manual){
+  if(planState.status==='loading')return;
+  if(!manual&&(Date.now()-planState.at<PLAN_AUTO_MS))return;
+  const tasks=state.tasks.filter(inCourse).filter(t=>t.status!=='done');
+  if(!tasks.length){planState.result=null;planState.status='idle';return;}
+  planAbort?.abort();const controller=planAbort=new AbortController();
+  planState.status='loading';planState.error='';planState.hint='';if(view==='tasks')render();
+  try{
+    let setup=kiView.configuration();if(!setup.ready){await kiView.load();setup=kiView.configuration();}
+    if(!setup.ready||!setup.model){const e=new Error('Für die Aufgabenprüfung muss im Context Agent ein KI-Anbieter mit Modell verbunden sein.');e.soft=true;throw e;}
+    const projects=state.projects.filter(p=>!p.archived&&courseMatches(p.id,state.activeCourse));
+    const context=buildTaskContext({tasks:state.tasks.filter(inCourse),projects,events:(state.calendarEvents||[]).filter(inCourse),updates:planCourseUpdates(),courseOf:n=>notificationCourse(n,state),today:dateKey()});
+    const result=await analyzeTasks({provider:setup.provider,model:setup.model,context,signal:controller.signal});
+    if(controller.signal.aborted)return;
+    planState.result=result;planState.status='ready';planState.at=Date.now();planState.hint=`Geprüft mit ${setup.provider==='local'?'lokalem Modell':setup.provider==='openrouter'?'OpenRouter':'KI:connect NRW'} · ${context.taskCount} Aufgaben, ${context.updateCount} Mitteilungen`;
+  }catch(err){
+    if(err?.name==='AbortError')return;
+    planState.status=err?.soft&&!manual?'idle':'error';planState.error=err?.soft&&!manual?'':(err?.message||'Die Prüfung ist fehlgeschlagen.');planState.at=err?.soft?0:Date.now();
+  }finally{if(planAbort===controller)planAbort=undefined;if(view==='tasks'&&!modal.open)render();}
+}
+function acceptPlanSuggestion(index){
+  const list=planState.result?.suggestions||[],s=list[index];if(!s)return;
+  if(state.tasks.length>=1000){toast('Höchstens 1.000 Aufgaben.');return;}
+  state.tasks.push({id:uid(),title:s.title,projectId:s.projectId||(state.activeCourse&&state.projects.some(p=>p.id===state.activeCourse)?state.activeCourse:''),status:'todo',due:s.due||'',url:'',createdAt:new Date().toISOString()});
+  list.splice(index,1);const saved=commit(`${s.title} gespeichert`);toast(saved?'Aufgabe übernommen.':'Aufgabe nur im Arbeitsspeicher. Bitte Backup exportieren.');render();
+}
+function planCard(t,insight,issues){
+  const p=project(t.projectId);
+  return `<article class="plan-card ${insight?.priority?'prio-'+insight.priority:''}"><div class="plan-card-head"><button class="plan-title" data-action="edit-task" data-id="${t.id}">${esc(t.title)}</button>${insight?.priority?`<span class="tag">${esc(insight.priority)}</span>`:''}</div><div class="task-meta">${p?`<span class="project-dot ${p.color}"></span>${esc(p.name)}`:'Persönlich'}${t.due?`<span class="due">${icon('calendar',12)}${dateLabel(t.due)}</span>`:''}${insight?.effort?`<span>Aufwand: ${esc(insight.effort)}</span>`:''}</div>${insight?`<p class="plan-summary">${esc(insight.summary)}</p>${insight.steps.length?`<ol class="plan-steps">${insight.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:''}${insight.reason?`<small class="plan-reason">${esc(insight.reason)}</small>`:''}`:''}${issues.map(i=>`<p class="plan-issue" role="note">⚠ ${esc(i.message)}</p>`).join('')}</article>`;
+}
+function renderPlan(){
+  const tasks=state.tasks.filter(inCourse),groups=groupTasks(tasks,dateKey()),total=Object.values(groups).reduce((n,g)=>n+g.length,0);
+  const insights=new Map((planState.result?.tasks||[]).map(i=>[i.id,i])),issues=planState.result?.issues||[],suggestions=planState.result?.suggestions||[];
+  const loading=planState.status==='loading';
+  const bar=`<div class="plan-bar"><div><strong>Mein Plan</strong><small>${loading?'Die KI prüft deine Aufgaben, Termine und Mitteilungen …':esc(planState.hint||'Die KI prüft beim Öffnen und auf Knopfdruck, was zuerst dran ist.')}</small></div><button class="button secondary" data-action="plan-check" ${loading?'disabled':''}>${icon('refresh',16)} ${loading?'Prüft …':'KI prüfen'}</button></div>`;
+  if(!total&&!suggestions.length)return `<section class="plan" aria-label="Mein Plan">${bar}<p class="quiet-row">Keine offenen Aufgaben. Mit „KI prüfen" sucht die KI trotzdem in Mitteilungen nach neuen.</p></section>`;
+  const sugg=suggestions.length?`<div class="plan-group"><h3>Neu gefunden · ${suggestions.length}</h3>${suggestions.map((s,i)=>`<article class="plan-card suggestion"><div class="plan-card-head"><strong>${esc(s.title)}</strong></div><div class="task-meta">${s.projectId&&project(s.projectId)?`<span class="project-dot ${project(s.projectId).color}"></span>${esc(project(s.projectId).name)}`:''}${s.due?`<span class="due">${icon('calendar',12)}${dateLabel(s.due)}</span>`:''}</div>${s.reason?`<small class="plan-reason">Beleg: ${esc(s.reason)}</small>`:''}<div class="plan-actions"><button class="button primary" data-action="plan-accept" data-index="${i}">${icon('plus',15)} Übernehmen</button><button class="button secondary" data-action="plan-dismiss" data-index="${i}">Verwerfen</button></div></article>`).join('')}</div>`:'';
+  const err=planState.error?`<p class="plan-error" role="alert">${esc(planState.error)}</p>`:'';
+  return `<section class="plan" aria-label="Mein Plan">${bar}${err}${sugg}${PLAN_GROUPS.map(([k,name])=>groups[k].length?`<div class="plan-group ${k}"><h3>${name} · ${groups[k].length}</h3><div class="plan-cards">${groups[k].map(t=>planCard(t,insights.get(t.id),issues.filter(i=>i.taskId===t.id))).join('')}</div></div>`:'').join('')}</section>`;
+}
 function renderTasks() {
   const c=taskCounts(scopedState());
   let list=state.tasks.filter(t=>inCourse(t)&&(!taskProject||t.projectId===taskProject)&&(taskFilter==='all'||(taskFilter==='done'?t.status==='done':taskFilter==='due'?t.status!=='done'&&t.due&&t.due<=dateKey():t.status!=='done'))).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
-  return heading('EIN SCHRITT NACH DEM ANDEREN','Aufgaben','Fristen und nächste Schritte.',`<button class="button primary" data-action="add-task">${icon('plus',17)} Neue Aufgabe</button>`)+`<div class="filter-row wrap"><div class="filters">${[['open','Offen',c.open],['due','Fällig',c.due],['done','Erledigt',c.done],['all','Alle',state.tasks.filter(inCourse).length]].map(([id,n,count])=>`<button class="filter ${taskFilter===id?'selected':''}" data-action="task-filter" data-value="${id}">${n}<span>${count}</span></button>`).join('')}</div><label class="select-label">Projekt<select id="task-project-filter"><option value="">Alle Projekte</option>${state.projects.map(p=>`<option value="${p.id}" ${state.activeCourse===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div><section class="task-list">${list.length?list.map(t=>taskRow(t)).join(''):empty(taskFilter==='done'?'Noch nichts abgeschlossen.':taskFilter==='due'?'Alles im grünen Bereich.':'Platz für deinen nächsten Schritt.',taskFilter==='due'?'Keine offenen Aufgaben sind heute fällig.':'Füge eine Aufgabe hinzu und verknüpfe sie bei Bedarf mit einem Projekt.','Aufgabe anlegen','data-action="add-task"','tasks')}</section><p class="subtle-note">Persönliche Aufgaben. GitLab-Issues werden hier noch nicht automatisch synchronisiert.</p>`;
+  return heading('EIN SCHRITT NACH DEM ANDEREN','Aufgaben','Fristen und nächste Schritte.',`<button class="button primary" data-action="add-task">${icon('plus',17)} Neue Aufgabe</button>`)+renderPlan()+`<div class="filter-row wrap"><div class="filters">${[['open','Offen',c.open],['due','Fällig',c.due],['done','Erledigt',c.done],['all','Alle',state.tasks.filter(inCourse).length]].map(([id,n,count])=>`<button class="filter ${taskFilter===id?'selected':''}" data-action="task-filter" data-value="${id}">${n}<span>${count}</span></button>`).join('')}</div><label class="select-label">Projekt<select id="task-project-filter"><option value="">Alle Projekte</option>${state.projects.map(p=>`<option value="${p.id}" ${state.activeCourse===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div><section class="task-list">${list.length?list.map(t=>taskRow(t)).join(''):empty(taskFilter==='done'?'Noch nichts abgeschlossen.':taskFilter==='due'?'Alles im grünen Bereich.':'Platz für deinen nächsten Schritt.',taskFilter==='due'?'Keine offenen Aufgaben sind heute fällig.':'Füge eine Aufgabe hinzu und verknüpfe sie bei Bedarf mit einem Projekt.','Aufgabe anlegen','data-action="add-task"','tasks')}</section><p class="subtle-note">Persönliche Aufgaben. GitLab-Issues werden hier noch nicht automatisch synchronisiert.</p>`;
 }
 function renderBookmarks() {
   return heading('GUT AUFGEHOBEN','Ablage','',`<button class="button primary" data-action="add-link">${icon('plus',17)} Neuer Link</button>`)+`<div class="bookmark-grid">${state.bookmarks.filter(inCourse).map(b=>`<article class="bookmark-card"><div class="bookmark-top">${monogram(b.tool)}<span class="tag">${esc(meta(b.tool).name)}</span>${iconAction('edit',b.title+' bearbeiten',`data-action="edit-link" data-id="${b.id}"`)}</div>${external(b.url,b.title,'bookmark-title')}<p>${esc(b.note)||esc(new URL(b.url).hostname)}</p><div class="bookmark-footer"><span>${esc(project(b.projectId)?.name || 'Persönliche Ablage')}</span></div></article>`).join('')||empty('Noch keine Links','Beiträge, Dateien und Repositories hier ablegen.','Link hinzufügen','data-action="add-link"','links')}</div>`;
@@ -570,6 +621,28 @@ function modalHead(title,sub='') { return `<div class="modal-head"><div><p class
 function formError() { return '<p class="form-error" role="alert" hidden></p>'; }
 function projectOptions(current=state.activeCourse) { return `<option value="">Persönlich / ohne Projekt</option>${state.projects.filter(p=>!p.archived || p.id===current).map(p=>`<option value="${p.id}" ${current===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}`; }
 function toolOptions(current='spaces') { return LINK_META.map(t=>`<option value="${t.id}" ${current===t.id?'selected':''}>${t.name}</option>`).join(''); }
+let courseDiscoveryAbort;
+function discoveryModal(body){openModal(modalHead('Neue Kurse suchen','Liest nur die Spaces-Startseite, ändert nichts in Spaces.')+`<div id="course-discovery">${body}</div>`);}
+function discoveryRows(courses){return courses.map(c=>`<div class="discovery-row"><span><strong>${esc(c.title)}</strong><small>${esc(c.url)}</small></span><button class="button primary" data-action="add-discovered-course" data-url="${esc(c.url)}" data-title="${esc(c.title)}">${icon('plus',15)} Hinzufügen</button></div>`).join('');}
+async function discoverCourses(){
+  if(!agentBrowserAvailable()){toast('Das Suchen neuer Kurse benötigt die Context-Desktop-App.');return;}
+  courseDiscoveryAbort?.abort();const controller=courseDiscoveryAbort=new AbortController();
+  discoveryModal('<p class="quiet-row">Spaces wird nach neuen Kursen durchsucht …</p>');
+  try{
+    const result=await discoverNewCourses({projects:state.projects,request:requestAgentBrowser,signal:controller.signal});
+    if(controller.signal.aborted)return;
+    const box=$('#course-discovery');if(!box)return;
+    box.innerHTML=result.status==='login_required'?'<p class="quiet-row">Bitte zuerst im Browser bei Spaces anmelden und danach erneut suchen.</p>':result.status==='update_required'?'<p class="quiet-row">Diese Browser-Version kann die Spaces-Startseite noch nicht auslesen. Bitte die App aktualisieren.</p>':result.courses.length?`<p class="quiet-row">${result.courses.length} neue${result.courses.length===1?'r Kurs':' Kurse'} gefunden:</p>${discoveryRows(result.courses)}`:'<p class="quiet-row">Keine neuen Kurse gefunden. Alle erkannten Kurse sind schon vorhanden.</p>';
+  }catch(err){if(err?.name==='AbortError')return;const box=$('#course-discovery');if(box)box.innerHTML=`<p class="quiet-row">Die Suche ist fehlgeschlagen: ${esc(err.message||'Unbekannter Fehler')}</p>`;}
+}
+function addDiscoveredCourse(url,title){
+  const name=cleanText(title,200)||'Neuer Kurs';
+  if(state.projects.some(p=>p.links.some(l=>l.tool==='spaces'&&l.url===url)))return;
+  state.projects.push({id:uid(),name,subtitle:'Aus Spaces übernommen',color:'blue',links:[{id:uid(),title:'Kurs-Space',tool:'spaces',url:safeURL(url)}],note:'',archived:false});
+  const saved=commit(`${name} gespeichert`);
+  const row=document.querySelector(`#course-discovery [data-url="${CSS.escape(url)}"]`)?.closest('.discovery-row');row?.remove();
+  toast(saved?`${name} wurde hinzugefügt.`:'Kurs nur im Arbeitsspeicher. Bitte Backup exportieren.');
+}
 function editProject(id) {
   const p=id?project(id):null;
   openModal(modalHead(p?'Projekt bearbeiten':'Neues Projekt')+`<form id="project-form" data-id="${id||''}"><label>Projektname<input name="name" required maxlength="200" value="${esc(p?.name||'')}" placeholder="z. B. Interactive Applications" autofocus></label><label>Kurs, Semester oder Beschreibung<input name="subtitle" maxlength="200" value="${esc(p?.subtitle||'')}" placeholder="Wintersemester 2026/27"></label><label>Projektfarbe<select name="color">${[['violet','Lavendel'],['peach','Apricot'],['green','Salbei'],['blue','Blau'],['yellow','Sand']].map(([v,n])=>`<option value="${v}" ${p?.color===v?'selected':''}>${n}</option>`).join('')}</select></label>${formError()}<div class="form-footer"><button class="button secondary" type="button" data-action="close">Abbrechen</button><button class="button primary" type="submit">${p?'Speichern':'Projekt anlegen'} ${icon('arrow',16)}</button></div></form>`);
@@ -661,6 +734,10 @@ document.addEventListener('click',e=>{
   if(action==='toggle-theme')window.contextTheme?.toggle();
   else if(action==='search')openSearch();
   else if(action==='spaces-crawl')void crawlerView.open();
+  else if(action==='discover-courses')void discoverCourses();
+  else if(action==='plan-check')void runPlanCheck(true);
+  else if(action==='plan-accept')acceptPlanSuggestion(Number(b.dataset.index));
+  else if(action==='plan-dismiss'){planState.result?.suggestions?.splice(Number(b.dataset.index),1);render();}
   else if(action==='context-agent')floatingAgent.toggle();
   else if(action==='companion-course'){state.activeCourse=id;kiView.scopeChanged();commit();setView('companion');}
   else if(action==='ask-assistant'){kiView.prefill(value);setView('ai');$('#ki-prompt')?.focus();}
