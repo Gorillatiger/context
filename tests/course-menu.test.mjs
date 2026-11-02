@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readCourseMenu,cleanCourses} from '../desktop/course-menu.mjs';
+import {readCourseMenu,cleanCourses,extractCourses,requestPaths} from '../desktop/course-menu.mjs';
 
 // Minimale DOM-Attrappe: Elemente mit Kindern, Text und Attributen.
 class El{
@@ -40,11 +40,30 @@ test('opens the Spaces menu when the cards are not in the page yet',async()=>{
 
 test('a login page returns no courses',async()=>{
   const login=page([new El('input',{attrs:{type:'password'}})]);
-  assert.deepEqual(await readCourseMenu(ctx(login),async()=>{}),{loginRequired:true,courses:[]});
+  assert.deepEqual(await readCourseMenu(ctx(login),async()=>{}),{loginRequired:true,courses:[],captured:[]});
 });
 
 test('main-process cleaning keeps only single-segment Spaces course roots',()=>{
   const out=cleanCourses([{url:'https://spaces.th-koeln.de/a-b/x',title:' A\n B '},{url:'https://evil.example/a/'},{url:'https://spaces.th-koeln.de/'},{url:'javascript:1'}]);
   assert.deepEqual(out,[]);  // /a-b/x hat zwei Segmente
   assert.deepEqual(cleanCourses([{url:'https://spaces.th-koeln.de/a-b/',title:' A\n B '},{url:'https://spaces.th-koeln.de/a-b/',title:'doppelt'}]),[{url:'https://spaces.th-koeln.de/a-b/',title:'A B'}]);
+});
+
+test('backend answers are mined whatever their shape (JSON objects, rendered titles, HTML fragments)',()=>{
+  const json=JSON.stringify({spaces:[{id:1,title:{rendered:'Prototyping Things W2026 &amp; mehr'},link:'https://spaces.th-koeln.de/prototyping-things-w26/'},{id:2,name:'Studio Code',url:'/studio-code/'},{id:3,title:'Beitrag',link:'https://spaces.th-koeln.de/blog/2026/post/'}]});
+  const html=JSON.stringify({html:'<ul><li><a href="https://spaces.th-koeln.de/werkstattpraktikum/"><span>Seminar</span> Werkstattpraktikum</a></li></ul>'});
+  const out=cleanCourses(extractCourses([{path:'/a',body:json},{path:'/b',body:html},{path:'/c',body:'<a href="/c-and-c-central/">Code and Context Central</a>'},{path:'/d',body:'kein json'}]));
+  assert.deepEqual(out.map(c=>c.url),['https://spaces.th-koeln.de/prototyping-things-w26/','https://spaces.th-koeln.de/studio-code/','https://spaces.th-koeln.de/werkstattpraktikum/','https://spaces.th-koeln.de/c-and-c-central/']);
+  assert.equal(out[0].title,'Prototyping Things W2026 & mehr');assert.equal(out[2].title,'Seminar Werkstattpraktikum');
+});
+
+test('menu reading records XHR/fetch answers made while the menu opens and restores the page functions',async()=>{
+  let fetched=0;const original=async()=>({clone(){return {text:async()=>JSON.stringify([{link:'https://spaces.th-koeln.de/neu/',title:'Neu'}])};}});
+  const hidden=new El('div');
+  const opener=new El('button',{text:'Spaces',attrs:{inHeader:true},onClick:()=>{fetched++;void host.fetch('/wp-json/x/spaces');}});
+  const host=ctx(page([opener,hidden]));host.fetch=original;
+  const r=await readCourseMenu(host,async()=>{await new Promise(r=>setTimeout(r,5));});
+  assert.equal(fetched,1);assert.equal(host.fetch,original);
+  assert.deepEqual(requestPaths(r.captured),['/wp-json/x/spaces']);
+  assert.deepEqual(cleanCourses(extractCourses(r.captured)).map(c=>c.url),['https://spaces.th-koeln.de/neu/']);
 });

@@ -34,5 +34,5 @@ export async function discoverNewCourses({projects,request,signal}){
     const title=typeof l.title==='string'?l.title.replace(/\s+/g,' ').trim().slice(0,160):'';
     found.set(url,{url,title:title||decodeURIComponent(new URL(url).pathname.replaceAll('/','')).replace(/[-_]+/g,' ')});
   }
-  return {status:'ok',courses:[...found.values()].slice(0,30),checked:page.courses.length};
+  return {status:'ok',courses:[...found.values()].slice(0,30),checked:page.courses.length,requests:Array.isArray(page.requests)?page.requests.filter(r=>typeof r==='string').slice(0,20):[]};
 }
