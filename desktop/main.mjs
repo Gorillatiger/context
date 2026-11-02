@@ -33,6 +33,7 @@ import {createCourseFileFetch} from './course-file-fetch.mjs';
 import {createMiroShareLinks} from './miro-links.mjs';
 import {createMiroVisitorReader,miroOffscreenViews} from './miro-visitor.mjs';
 import {safeMiroBoard} from '../connectors/miro.mjs';
+import {courseMenuScript,cleanCourses} from './course-menu.mjs';
 // Cloud AI keys are kept encrypted by the OS (safeStorage) and restored on start; see desktop/key-store.mjs.
 const desktopKeys=createDesktopKeyStore({directory:path.join(app.getPath('userData'),'ai'),crypto:safeStorage});
 const desktopAI=createDesktopAI(createKIClient({provider:'openrouter',credentialStore:desktopKeys.forProvider('openrouter')}));
